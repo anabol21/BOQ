@@ -1,0 +1,2 @@
+[console_scripts]
+dwave = dwave.cloud.cli:cli

@@ -1,0 +1,136 @@
+show_id,cinema_id,hall_id,hall_capacity,movie_id,genre,age_rating,runtime_min,release_date,show_datetime,format,base_price,sold_tickets,occupancy_rate,city,day_of_week,is_weekend,hour_bucket,month,holiday_flag,release_age_days,lead_time_days,prime_time_flag,runtime_bucket,screening_number_for_movie
+show_00380,cinema_msk_01,hall_2,80,movie_horror_01,horror,18+,98,2026-03-05,2026-04-12 14:00:00,3D,491.41,45,0.5625,Moscow,6,True,day,4,False,38,7.7,True,medium,101
+show_00790,cinema_spb_01,hall_1,100,movie_horror_01,horror,18+,98,2026-03-05,2026-04-12 14:15:00,3D,438.61,47,0.47,Saint Petersburg,6,True,day,4,False,38,8.2,True,medium,68
+show_00794,cinema_spb_01,hall_2,70,movie_family_01,animation,6+,92,2026-02-20,2026-04-12 15:00:00,IMAX,556.41,45,0.6429,Saint Petersburg,6,True,day,4,False,51,4.0,True,medium,49
+show_00383,cinema_msk_01,hall_3,60,movie_family_01,animation,6+,92,2026-02-20,2026-04-12 15:00:00,3D,525.47,43,0.7167,Moscow,6,True,day,4,False,51,7.0,True,medium,97
+show_00377,cinema_msk_01,hall_1,120,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-12 15:00:00,IMAX,621.31,84,0.7,Moscow,6,True,day,4,False,42,21.0,True,long,89
+show_00381,cinema_msk_01,hall_2,80,movie_family_01,animation,6+,92,2026-02-20,2026-04-12 18:30:00,IMAX,713.82,70,0.875,Moscow,6,True,evening,4,False,51,12.6,True,medium,96
+show_00378,cinema_msk_01,hall_1,120,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-12 18:45:00,3D,570.45,120,1.0,Moscow,6,True,evening,4,False,42,20.8,True,long,90
+show_00791,cinema_spb_01,hall_1,100,movie_family_01,animation,6+,92,2026-02-20,2026-04-12 19:30:00,2D,405.52,80,0.8,Saint Petersburg,6,True,evening,4,False,51,16.6,True,medium,48
+show_00384,cinema_msk_01,hall_3,60,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-12 19:30:00,3D,583.34,45,0.75,Moscow,6,True,evening,4,False,61,18.3,True,medium,95
+show_00795,cinema_spb_01,hall_2,70,movie_horror_01,horror,18+,98,2026-03-05,2026-04-12 19:45:00,IMAX,633.08,48,0.6857,Saint Petersburg,6,True,evening,4,False,38,15.6,True,medium,70
+show_00796,cinema_spb_01,hall_2,70,movie_horror_01,horror,18+,98,2026-03-05,2026-04-12 21:45:00,IMAX,626.08,53,0.7571,Saint Petersburg,6,True,evening,4,False,38,6.7,True,medium,71
+show_00792,cinema_spb_01,hall_1,100,movie_horror_01,horror,18+,98,2026-03-05,2026-04-12 22:45:00,3D,517.75,58,0.58,Saint Petersburg,6,True,evening,4,False,38,20.1,False,medium,69
+show_00387,cinema_msk_01,hall_2,80,movie_horror_01,horror,18+,98,2026-03-05,2026-04-13 10:15:00,2D,397.16,15,0.1875,Moscow,0,False,morning,4,False,39,5.3,False,medium,103
+show_00385,cinema_msk_01,hall_1,120,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-13 11:15:00,IMAX,614.17,32,0.2667,Moscow,0,False,morning,4,False,43,9.9,False,long,91
+show_00797,cinema_spb_01,hall_1,100,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-13 11:15:00,2D,329.6,7,0.07,Saint Petersburg,0,False,morning,4,False,62,3.7,False,medium,64
+show_00390,cinema_msk_01,hall_3,60,movie_horror_01,horror,18+,98,2026-03-05,2026-04-13 11:30:00,IMAX,607.47,12,0.2,Moscow,0,False,morning,4,False,39,12.4,False,medium,104
+show_00800,cinema_spb_01,hall_2,70,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-13 11:30:00,2D,311.92,12,0.1714,Saint Petersburg,0,False,morning,4,False,62,3.9,False,medium,66
+show_00386,cinema_msk_01,hall_1,120,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-13 14:15:00,3D,508.08,33,0.275,Moscow,0,False,day,4,False,62,20.8,False,medium,96
+show_00391,cinema_msk_01,hall_3,60,movie_horror_01,horror,18+,98,2026-03-05,2026-04-13 14:30:00,3D,518.44,18,0.3,Moscow,0,False,day,4,False,39,16.5,False,medium,105
+show_00798,cinema_spb_01,hall_1,100,movie_family_01,animation,6+,92,2026-02-20,2026-04-13 14:30:00,2D,355.43,26,0.26,Saint Petersburg,0,False,day,4,False,52,12.2,False,medium,50
+show_00801,cinema_spb_01,hall_2,70,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-13 14:45:00,2D,351.33,28,0.4,Saint Petersburg,0,False,day,4,False,62,17.5,False,medium,67
+show_00388,cinema_msk_01,hall_2,80,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-13 15:45:00,2D,410.16,32,0.4,Moscow,0,False,day,4,False,43,12.6,False,long,92
+show_00799,cinema_spb_01,hall_1,100,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-13 18:00:00,2D,420.21,55,0.55,Saint Petersburg,0,False,evening,4,False,62,18.0,True,medium,65
+show_00389,cinema_msk_01,hall_2,80,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-13 18:15:00,3D,566.68,49,0.6125,Moscow,0,False,evening,4,False,62,5.3,True,medium,97
+show_00392,cinema_msk_01,hall_1,120,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-14 11:30:00,IMAX,580.79,47,0.3917,Moscow,1,False,morning,4,False,44,20.9,False,long,93
+show_00802,cinema_spb_01,hall_1,100,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-14 11:30:00,IMAX,528.57,26,0.26,Saint Petersburg,1,False,morning,4,False,63,17.1,False,medium,68
+show_00805,cinema_spb_01,hall_2,70,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-14 11:45:00,IMAX,537.24,11,0.1571,Saint Petersburg,1,False,morning,4,False,63,12.0,False,medium,70
+show_00394,cinema_msk_01,hall_2,80,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-14 11:45:00,IMAX,596.75,30,0.375,Moscow,1,False,morning,4,False,44,12.4,False,long,94
+show_00396,cinema_msk_01,hall_3,60,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-14 11:45:00,2D,417.32,13,0.2167,Moscow,1,False,morning,4,False,63,3.7,False,medium,99
+show_00803,cinema_spb_01,hall_1,100,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-14 14:00:00,IMAX,533.92,34,0.34,Saint Petersburg,1,False,day,4,False,63,13.5,False,medium,69
+show_00395,cinema_msk_01,hall_2,80,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-14 14:00:00,2D,441.12,26,0.325,Moscow,1,False,day,4,False,63,17.1,False,medium,98
+show_00393,cinema_msk_01,hall_1,120,movie_horror_01,horror,18+,98,2026-03-05,2026-04-14 14:45:00,3D,498.22,25,0.2083,Moscow,1,False,day,4,False,40,5.2,False,medium,106
+show_00397,cinema_msk_01,hall_3,60,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-14 15:15:00,2D,413.6,27,0.45,Moscow,1,False,day,4,False,44,15.1,False,long,95
+show_00806,cinema_spb_01,hall_2,70,movie_family_01,animation,6+,92,2026-02-20,2026-04-14 15:45:00,2D,368.72,22,0.3143,Saint Petersburg,1,False,day,4,False,53,12.1,False,medium,51
+show_00398,cinema_msk_01,hall_3,60,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-14 18:00:00,IMAX,686.99,40,0.6667,Moscow,1,False,evening,4,False,63,7.2,True,medium,100
+show_00807,cinema_spb_01,hall_2,70,movie_horror_01,horror,18+,98,2026-03-05,2026-04-14 18:15:00,3D,516.87,36,0.5143,Saint Petersburg,1,False,evening,4,False,40,3.6,True,medium,72
+show_00804,cinema_spb_01,hall_1,100,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-14 19:45:00,2D,417.85,83,0.83,Saint Petersburg,1,False,evening,4,False,44,4.1,True,long,74
+show_00808,cinema_spb_01,hall_1,100,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-15 11:00:00,3D,411.65,23,0.23,Saint Petersburg,2,False,morning,4,False,45,13.3,False,long,75
+show_00404,cinema_msk_01,hall_3,60,movie_family_01,animation,6+,92,2026-02-20,2026-04-15 11:00:00,IMAX,604.73,17,0.2833,Moscow,2,False,morning,4,False,54,18.7,False,medium,99
+show_00399,cinema_msk_01,hall_1,120,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-15 11:30:00,3D,474.3,31,0.2583,Moscow,2,False,morning,4,False,64,16.3,False,medium,101
+show_00810,cinema_spb_01,hall_2,70,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-15 11:45:00,IMAX,533.38,10,0.1429,Saint Petersburg,2,False,morning,4,False,64,11.1,False,medium,71
+show_00401,cinema_msk_01,hall_2,80,movie_horror_01,horror,18+,98,2026-03-05,2026-04-15 11:45:00,IMAX,609.06,14,0.175,Moscow,2,False,morning,4,False,41,19.0,False,medium,107
+show_00402,cinema_msk_01,hall_2,80,movie_horror_01,horror,18+,98,2026-03-05,2026-04-15 14:00:00,IMAX,634.45,28,0.35,Moscow,2,False,day,4,False,41,11.7,False,medium,108
+show_00811,cinema_spb_01,hall_2,70,movie_horror_01,horror,18+,98,2026-03-05,2026-04-15 14:15:00,3D,413.57,7,0.1,Saint Petersburg,2,False,day,4,False,41,15.0,False,medium,73
+show_00809,cinema_spb_01,hall_1,100,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-15 14:45:00,3D,423.95,38,0.38,Saint Petersburg,2,False,day,4,False,45,19.0,False,long,76
+show_00405,cinema_msk_01,hall_3,60,movie_horror_01,horror,18+,98,2026-03-05,2026-04-15 15:15:00,3D,523.06,21,0.35,Moscow,2,False,day,4,False,41,14.9,False,medium,109
+show_00400,cinema_msk_01,hall_1,120,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-15 15:30:00,3D,528.49,43,0.3583,Moscow,2,False,day,4,False,45,17.7,False,long,96
+show_00406,cinema_msk_01,hall_3,60,movie_family_01,animation,6+,92,2026-02-20,2026-04-15 18:00:00,IMAX,689.64,37,0.6167,Moscow,2,False,evening,4,False,54,18.3,True,medium,100
+show_00403,cinema_msk_01,hall_2,80,movie_family_01,animation,6+,92,2026-02-20,2026-04-15 19:00:00,3D,561.84,51,0.6375,Moscow,2,False,evening,4,False,54,19.6,True,medium,98
+show_00407,cinema_msk_01,hall_1,120,movie_horror_01,horror,18+,98,2026-03-05,2026-04-16 10:15:00,3D,482.92,13,0.1083,Moscow,3,False,morning,4,False,42,17.7,False,medium,110
+show_00414,cinema_msk_01,hall_3,60,movie_horror_01,horror,18+,98,2026-03-05,2026-04-16 10:45:00,IMAX,580.17,14,0.2333,Moscow,3,False,morning,4,False,42,13.6,False,medium,112
+show_00816,cinema_spb_01,hall_2,70,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-16 11:00:00,3D,390.22,8,0.1143,Saint Petersburg,3,False,morning,4,False,65,7.6,False,medium,73
+show_00812,cinema_spb_01,hall_1,100,movie_horror_01,horror,18+,98,2026-03-05,2026-04-16 11:15:00,3D,414.64,25,0.25,Saint Petersburg,3,False,morning,4,False,42,12.7,False,medium,74
+show_00410,cinema_msk_01,hall_2,80,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-16 11:30:00,2D,404.0,17,0.2125,Moscow,3,False,morning,4,False,46,18.2,False,long,98
+show_00817,cinema_spb_01,hall_2,70,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-16 14:15:00,3D,421.92,8,0.1143,Saint Petersburg,3,False,day,4,False,65,15.2,False,medium,74
+show_00813,cinema_spb_01,hall_1,100,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-16 14:30:00,IMAX,553.07,25,0.25,Saint Petersburg,3,False,day,4,False,46,13.1,False,long,77
+show_00408,cinema_msk_01,hall_1,120,movie_horror_01,horror,18+,98,2026-03-05,2026-04-16 14:45:00,3D,494.11,37,0.3083,Moscow,3,False,day,4,False,42,5.1,False,medium,111
+show_00415,cinema_msk_01,hall_3,60,movie_horror_01,horror,18+,98,2026-03-05,2026-04-16 14:45:00,IMAX,634.25,9,0.15,Moscow,3,False,day,4,False,42,17.1,False,medium,113
+show_00411,cinema_msk_01,hall_2,80,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-16 15:45:00,2D,443.2,28,0.35,Moscow,3,False,day,4,False,46,16.7,False,long,99
+show_00814,cinema_spb_01,hall_1,100,movie_horror_01,horror,18+,98,2026-03-05,2026-04-16 18:15:00,IMAX,628.22,67,0.67,Saint Petersburg,3,False,evening,4,False,42,19.1,True,medium,75
+show_00818,cinema_spb_01,hall_2,70,movie_family_01,animation,6+,92,2026-02-20,2026-04-16 18:30:00,3D,489.46,40,0.5714,Saint Petersburg,3,False,evening,4,False,55,19.1,True,medium,52
+show_00409,cinema_msk_01,hall_1,120,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-16 19:00:00,2D,506.18,106,0.8833,Moscow,3,False,evening,4,False,46,17.3,True,long,97
+show_00412,cinema_msk_01,hall_2,80,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-16 19:30:00,2D,509.7,61,0.7625,Moscow,3,False,evening,4,False,46,19.1,True,long,100
+show_00413,cinema_msk_01,hall_2,80,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-16 22:00:00,IMAX,710.29,36,0.45,Moscow,3,False,evening,4,False,65,6.5,False,medium,102
+show_00815,cinema_spb_01,hall_1,100,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-16 22:00:00,3D,493.6,45,0.45,Saint Petersburg,3,False,evening,4,False,65,13.6,False,medium,72
+show_00819,cinema_spb_01,hall_1,100,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-17 10:30:00,3D,396.3,21,0.21,Saint Petersburg,4,False,morning,4,False,47,11.4,False,long,78
+show_00419,cinema_msk_01,hall_2,80,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-17 11:00:00,IMAX,596.7,17,0.2125,Moscow,4,False,morning,4,False,66,11.6,False,medium,104
+show_00823,cinema_spb_01,hall_2,70,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-17 11:15:00,2D,333.58,16,0.2286,Saint Petersburg,4,False,morning,4,False,47,19.8,False,long,79
+show_00422,cinema_msk_01,hall_3,60,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-17 11:45:00,IMAX,589.5,22,0.3667,Moscow,4,False,morning,4,False,47,18.6,False,long,102
+show_00416,cinema_msk_01,hall_1,120,movie_family_01,animation,6+,92,2026-02-20,2026-04-17 11:45:00,3D,492.19,25,0.2083,Moscow,4,False,morning,4,False,56,10.2,False,medium,101
+show_00820,cinema_spb_01,hall_1,100,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-17 14:00:00,IMAX,552.19,27,0.27,Saint Petersburg,4,False,day,4,False,66,20.3,False,medium,75
+show_00417,cinema_msk_01,hall_1,120,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-17 14:45:00,IMAX,632.14,23,0.1917,Moscow,4,False,day,4,False,66,12.9,False,medium,103
+show_00423,cinema_msk_01,hall_3,60,movie_horror_01,horror,18+,98,2026-03-05,2026-04-17 15:00:00,3D,528.63,25,0.4167,Moscow,4,False,day,4,False,43,10.5,False,medium,114
+show_00824,cinema_spb_01,hall_2,70,movie_family_01,animation,6+,92,2026-02-20,2026-04-17 15:30:00,IMAX,551.36,18,0.2571,Saint Petersburg,4,False,day,4,False,56,18.1,False,medium,54
+show_00420,cinema_msk_01,hall_2,80,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-17 15:45:00,IMAX,612.26,30,0.375,Moscow,4,False,day,4,False,47,4.9,False,long,101
+show_00418,cinema_msk_01,hall_1,120,movie_family_01,animation,6+,92,2026-02-20,2026-04-17 18:15:00,IMAX,719.01,62,0.5167,Moscow,4,False,evening,4,False,56,15.9,True,medium,102
+show_00821,cinema_spb_01,hall_1,100,movie_horror_01,horror,18+,98,2026-03-05,2026-04-17 18:30:00,3D,518.72,61,0.61,Saint Petersburg,4,False,evening,4,False,43,4.5,True,medium,76
+show_00825,cinema_spb_01,hall_2,70,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-17 18:30:00,3D,519.95,60,0.8571,Saint Petersburg,4,False,evening,4,False,47,15.6,True,long,80
+show_00421,cinema_msk_01,hall_2,80,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-17 19:15:00,IMAX,691.81,63,0.7875,Moscow,4,False,evening,4,False,66,7.5,True,medium,105
+show_00826,cinema_spb_01,hall_2,70,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-17 22:15:00,IMAX,626.49,33,0.4714,Saint Petersburg,4,False,evening,4,False,66,20.0,False,medium,76
+show_00822,cinema_spb_01,hall_1,100,movie_family_01,animation,6+,92,2026-02-20,2026-04-17 22:15:00,IMAX,601.67,63,0.63,Saint Petersburg,4,False,evening,4,False,56,20.1,False,medium,53
+show_00830,cinema_spb_01,hall_2,70,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-18 10:00:00,3D,407.22,36,0.5143,Saint Petersburg,5,True,morning,4,False,48,9.7,False,long,81
+show_00426,cinema_msk_01,hall_2,80,movie_horror_01,horror,18+,98,2026-03-05,2026-04-18 10:30:00,IMAX,605.01,30,0.375,Moscow,5,True,morning,4,False,44,19.9,False,medium,115
+show_00424,cinema_msk_01,hall_1,120,movie_family_01,animation,6+,92,2026-02-20,2026-04-18 10:30:00,IMAX,589.02,55,0.4583,Moscow,5,True,morning,4,False,57,18.6,False,medium,103
+show_00827,cinema_spb_01,hall_1,100,movie_horror_01,horror,18+,98,2026-03-05,2026-04-18 11:15:00,IMAX,500.17,42,0.42,Saint Petersburg,5,True,morning,4,False,44,8.9,False,medium,77
+show_00429,cinema_msk_01,hall_3,60,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-18 11:30:00,2D,402.45,21,0.35,Moscow,5,True,morning,4,False,67,20.1,False,medium,107
+show_00430,cinema_msk_01,hall_3,60,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-18 14:00:00,3D,499.75,49,0.8167,Moscow,5,True,day,4,False,67,7.3,True,medium,108
+show_00828,cinema_spb_01,hall_1,100,movie_horror_01,horror,18+,98,2026-03-05,2026-04-18 14:15:00,IMAX,551.53,64,0.64,Saint Petersburg,5,True,day,4,False,44,19.1,True,medium,78
+show_00425,cinema_msk_01,hall_1,120,movie_family_01,animation,6+,92,2026-02-20,2026-04-18 15:15:00,3D,496.44,70,0.5833,Moscow,5,True,day,4,False,57,11.1,True,medium,104
+show_00831,cinema_spb_01,hall_2,70,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-18 15:15:00,IMAX,569.2,47,0.6714,Saint Petersburg,5,True,day,4,False,48,14.3,True,long,82
+show_00427,cinema_msk_01,hall_2,80,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-18 15:45:00,2D,417.35,43,0.5375,Moscow,5,True,day,4,False,67,17.1,True,medium,106
+show_00829,cinema_spb_01,hall_1,100,movie_horror_01,horror,18+,98,2026-03-05,2026-04-18 18:00:00,IMAX,624.05,82,0.82,Saint Petersburg,5,True,evening,4,False,44,5.2,True,medium,79
+show_00428,cinema_msk_01,hall_2,80,movie_horror_01,horror,18+,98,2026-03-05,2026-04-18 18:15:00,IMAX,688.53,56,0.7,Moscow,5,True,evening,4,False,44,12.7,True,medium,116
+show_00431,cinema_msk_01,hall_3,60,movie_horror_01,horror,18+,98,2026-03-05,2026-04-18 18:30:00,2D,516.45,47,0.7833,Moscow,5,True,evening,4,False,44,9.9,True,medium,117
+show_00832,cinema_spb_01,hall_2,70,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-18 19:00:00,3D,487.84,53,0.7571,Saint Petersburg,5,True,evening,4,False,67,19.3,True,medium,77
+show_00833,cinema_spb_01,hall_2,70,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-18 22:00:00,IMAX,629.55,36,0.5143,Saint Petersburg,5,True,evening,4,False,67,12.0,False,medium,78
+show_00837,cinema_spb_01,hall_2,70,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-19 10:00:00,3D,393.39,16,0.2286,Saint Petersburg,6,True,morning,4,False,68,12.6,False,medium,79
+show_00834,cinema_spb_01,hall_1,100,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-19 10:15:00,2D,320.92,39,0.39,Saint Petersburg,6,True,morning,4,False,49,7.7,False,long,83
+show_00435,cinema_msk_01,hall_2,80,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-19 10:15:00,3D,460.68,29,0.3625,Moscow,6,True,morning,4,False,68,10.0,False,medium,109
+show_00438,cinema_msk_01,hall_3,60,movie_family_01,animation,6+,92,2026-02-20,2026-04-19 11:15:00,2D,391.92,18,0.3,Moscow,6,True,morning,4,False,58,16.4,False,medium,106
+show_00432,cinema_msk_01,hall_1,120,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-19 11:45:00,3D,497.93,41,0.3417,Moscow,6,True,morning,4,False,49,19.2,False,long,103
+show_00436,cinema_msk_01,hall_2,80,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-19 14:00:00,IMAX,647.12,57,0.7125,Moscow,6,True,day,4,False,49,13.5,True,long,105
+show_00433,cinema_msk_01,hall_1,120,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-19 14:00:00,2D,431.51,80,0.6667,Moscow,6,True,day,4,False,49,15.1,True,long,104
+show_00838,cinema_spb_01,hall_2,70,movie_horror_01,horror,18+,98,2026-03-05,2026-04-19 14:15:00,2D,332.51,33,0.4714,Saint Petersburg,6,True,day,4,False,45,19.5,True,medium,80
+show_00439,cinema_msk_01,hall_3,60,movie_family_01,animation,6+,92,2026-02-20,2026-04-19 15:00:00,2D,431.9,39,0.65,Moscow,6,True,day,4,False,58,3.8,True,medium,107
+show_00835,cinema_spb_01,hall_1,100,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-19 15:15:00,IMAX,565.32,68,0.68,Saint Petersburg,6,True,day,4,False,49,15.2,True,long,84
+show_00437,cinema_msk_01,hall_2,80,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-19 18:30:00,IMAX,695.8,67,0.8375,Moscow,6,True,evening,4,False,68,4.6,True,medium,110
+show_00836,cinema_spb_01,hall_1,100,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-19 18:45:00,3D,494.46,87,0.87,Saint Petersburg,6,True,evening,4,False,49,10.8,True,long,85
+show_00434,cinema_msk_01,hall_1,120,movie_family_01,animation,6+,92,2026-02-20,2026-04-19 19:00:00,2D,482.17,96,0.8,Moscow,6,True,evening,4,False,58,11.3,True,medium,105
+show_00839,cinema_spb_01,hall_1,100,movie_horror_01,horror,18+,98,2026-03-05,2026-04-20 10:45:00,2D,310.02,18,0.18,Saint Petersburg,0,False,morning,4,False,46,13.7,False,medium,81
+show_00442,cinema_msk_01,hall_2,80,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-20 10:45:00,3D,484.78,18,0.225,Moscow,0,False,morning,4,False,69,5.3,False,medium,112
+show_00841,cinema_spb_01,hall_2,70,movie_horror_01,horror,18+,98,2026-03-05,2026-04-20 11:00:00,IMAX,527.73,0,0.0,Saint Petersburg,0,False,morning,4,False,46,5.2,False,medium,82
+show_00440,cinema_msk_01,hall_1,120,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-20 11:15:00,2D,386.44,29,0.2417,Moscow,0,False,morning,4,False,69,10.4,False,medium,111
+show_00444,cinema_msk_01,hall_3,60,movie_family_01,animation,6+,92,2026-02-20,2026-04-20 11:45:00,2D,405.63,23,0.3833,Moscow,0,False,morning,4,False,59,8.6,False,medium,109
+show_00842,cinema_spb_01,hall_2,70,movie_horror_01,horror,18+,98,2026-03-05,2026-04-20 14:00:00,2D,357.1,19,0.2714,Saint Petersburg,0,False,day,4,False,46,8.4,False,medium,83
+show_00441,cinema_msk_01,hall_1,120,movie_family_01,animation,6+,92,2026-02-20,2026-04-20 14:30:00,2D,412.69,43,0.3583,Moscow,0,False,day,4,False,59,6.3,False,medium,108
+show_00443,cinema_msk_01,hall_2,80,movie_horror_01,horror,18+,98,2026-03-05,2026-04-20 14:30:00,3D,496.1,30,0.375,Moscow,0,False,day,4,False,46,8.9,False,medium,118
+show_00840,cinema_spb_01,hall_1,100,movie_family_01,animation,6+,92,2026-02-20,2026-04-20 14:45:00,3D,419.47,39,0.39,Saint Petersburg,0,False,day,4,False,59,18.0,False,medium,55
+show_00445,cinema_msk_01,hall_3,60,movie_family_01,animation,6+,92,2026-02-20,2026-04-20 15:30:00,IMAX,624.35,27,0.45,Moscow,0,False,day,4,False,59,16.2,False,medium,110
+show_00446,cinema_msk_01,hall_3,60,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-20 19:45:00,2D,513.06,40,0.6667,Moscow,0,False,evening,4,False,50,14.6,True,long,106
+show_00450,cinema_msk_01,hall_2,80,movie_horror_01,horror,18+,98,2026-03-05,2026-04-21 10:15:00,2D,388.75,18,0.225,Moscow,1,False,morning,4,False,47,6.2,False,medium,119
+show_00453,cinema_msk_01,hall_3,60,movie_horror_01,horror,18+,98,2026-03-05,2026-04-21 10:45:00,3D,492.69,10,0.1667,Moscow,1,False,morning,4,False,47,13.6,False,medium,120
+show_00447,cinema_msk_01,hall_1,120,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-21 11:00:00,2D,403.16,50,0.4167,Moscow,1,False,morning,4,False,51,18.3,False,long,107
+show_00845,cinema_spb_01,hall_2,70,movie_family_01,animation,6+,92,2026-02-20,2026-04-21 11:30:00,2D,331.58,17,0.2429,Saint Petersburg,1,False,morning,4,False,60,4.8,False,medium,56
+show_00843,cinema_spb_01,hall_1,100,movie_horror_01,horror,18+,98,2026-03-05,2026-04-21 11:45:00,2D,331.5,8,0.08,Saint Petersburg,1,False,morning,4,False,47,14.1,False,medium,84
+show_00448,cinema_msk_01,hall_1,120,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-21 14:00:00,IMAX,615.95,41,0.3417,Moscow,1,False,day,4,False,70,19.1,False,medium,113
+show_00846,cinema_spb_01,hall_2,70,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-21 14:15:00,3D,419.73,23,0.3286,Saint Petersburg,1,False,day,4,False,70,10.6,False,medium,80
+show_00844,cinema_spb_01,hall_1,100,movie_horror_01,horror,18+,98,2026-03-05,2026-04-21 14:45:00,3D,423.58,41,0.41,Saint Petersburg,1,False,day,4,False,47,17.3,False,medium,85
+show_00451,cinema_msk_01,hall_2,80,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-21 15:15:00,3D,508.79,41,0.5125,Moscow,1,False,day,4,False,51,9.6,False,long,108
+show_00454,cinema_msk_01,hall_3,60,movie_horror_01,horror,18+,98,2026-03-05,2026-04-21 15:45:00,IMAX,619.2,25,0.4167,Moscow,1,False,day,4,False,47,3.1,False,medium,121
+show_00452,cinema_msk_01,hall_2,80,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-04-21 19:00:00,IMAX,713.19,67,0.8375,Moscow,1,False,evening,4,False,51,8.8,True,long,109
+show_00449,cinema_msk_01,hall_1,120,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-21 19:15:00,2D,500.09,81,0.675,Moscow,1,False,evening,4,False,70,11.4,True,medium,114
+show_00455,cinema_msk_01,hall_3,60,movie_family_01,animation,6+,92,2026-02-20,2026-04-21 19:15:00,2D,506.44,48,0.8,Moscow,1,False,evening,4,False,60,5.8,True,medium,111
+show_00847,cinema_spb_01,hall_1,100,movie_comedy_01,comedy,12+,105,2026-02-10,2026-04-22 10:15:00,IMAX,531.02,0,0.0,Saint Petersburg,2,False,morning,4,False,71,10.8,False,medium,81
+show_00456,cinema_msk_01,hall_1,120,movie_horror_01,horror,18+,98,2026-03-05,2026-04-22 11:00:00,IMAX,613.33,22,0.1833,Moscow,2,False,morning,4,False,48,11.6,False,medium,122

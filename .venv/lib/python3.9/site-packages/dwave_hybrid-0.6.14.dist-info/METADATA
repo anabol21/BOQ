@@ -1,0 +1,161 @@
+Metadata-Version: 2.4
+Name: dwave-hybrid
+Version: 0.6.14
+Summary: Hybrid Asynchronous Decomposition Solver Framework
+Home-page: https://github.com/dwavesystems/dwave-hybrid
+Author: D-Wave Systems Inc.
+Author-email: radomir@dwavesys.com
+License: Apache 2.0
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Operating System :: OS Independent
+Classifier: Development Status :: 3 - Alpha
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Requires-Python: >=3.9
+License-File: LICENSE
+Requires-Dist: numpy>=1.19.1
+Requires-Dist: networkx
+Requires-Dist: click>5
+Requires-Dist: plucky>=0.4.3
+Requires-Dist: dimod<0.13,>=0.12.2
+Requires-Dist: dwave-preprocessing>=0.5.4
+Requires-Dist: minorminer>=0.1.7
+Requires-Dist: dwave-networkx>=0.8.8
+Requires-Dist: dwave-system>=1.16.0
+Requires-Dist: dwave-cloud-client>=0.10.6
+Requires-Dist: dwave-samplers>=1.0.0
+Provides-Extra: test
+Requires-Dist: coverage; extra == "test"
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: home-page
+Dynamic: license
+Dynamic: license-file
+Dynamic: provides-extra
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+.. image:: https://badge.fury.io/py/dwave-hybrid.svg
+    :target: https://badge.fury.io/py/dwave-hybrid
+    :alt: Latest version on PyPI
+
+.. image:: https://circleci.com/gh/dwavesystems/dwave-hybrid.svg?style=shield
+    :target: https://circleci.com/gh/dwavesystems/dwave-hybrid
+    :alt: Linux/MacOS/Windows build status
+
+.. image:: https://img.shields.io/codecov/c/github/dwavesystems/dwave-hybrid/master.svg
+    :target: https://codecov.io/gh/dwavesystems/dwave-hybrid
+    :alt: Code coverage
+
+.. image:: https://img.shields.io/pypi/pyversions/dwave-hybrid.svg?style=flat
+    :target: https://pypi.org/project/dwave-hybrid/
+    :alt: Supported Python versions
+
+
+============
+dwave-hybrid
+============
+
+.. start_hybrid_about
+
+A general, minimal Python framework for building hybrid asynchronous
+decomposition samplers for quadratic unconstrained binary optimization (QUBO)
+problems.
+
+*dwave-hybrid* facilitates three aspects of solution development:
+
+*   Hybrid approaches to combining quantum and classical compute resources
+*   Evaluating a portfolio of algorithmic components and problem-decomposition
+    strategies
+*   Experimenting with workflow structures and parameters to obtain the best
+    application results
+
+The framework enables rapid development and insight into expected performance
+of productized versions of its experimental prototypes.
+
+Your optimized algorithmic components and other contributions to this project
+are welcome!
+
+.. end_hybrid_about
+
+
+Installation or Building
+========================
+
+Install from a package on PyPI::
+
+    pip install dwave-hybrid
+
+or from source in development mode::
+
+    git clone https://github.com/dwavesystems/dwave-hybrid.git
+    cd dwave-hybrid
+    pip install -e .
+
+
+Testing
+=======
+
+Install test requirements and run ``unittest``::
+
+    pip install -r tests/requirements.txt
+    python -m unittest
+
+
+Example
+=======
+
+.. start_hybrid_example
+
+.. code-block:: python
+
+    import dimod
+    import hybrid
+
+    # Construct a problem
+    bqm = dimod.BinaryQuadraticModel({}, {'ab': 1, 'bc': -1, 'ca': 1}, 0, dimod.SPIN)
+
+    # Define the workflow
+    iteration = hybrid.RacingBranches(
+        hybrid.InterruptableTabuSampler(),
+        hybrid.EnergyImpactDecomposer(size=2)
+        | hybrid.QPUSubproblemAutoEmbeddingSampler()
+        | hybrid.SplatComposer()
+    ) | hybrid.ArgMin()
+    workflow = hybrid.LoopUntilNoImprovement(iteration, convergence=3)
+
+    # Solve the problem
+    init_state = hybrid.State.from_problem(bqm)
+    final_state = workflow.run(init_state).result()
+
+    # Print results
+    print("Solution: sample={.samples.first}".format(final_state))
+
+.. end_hybrid_example
+
+
+Documentation
+=============
+
+Documentation for latest stable release included in Ocean is available
+`here <https://docs.dwavequantum.com/en/latest/ocean/api_ref_hybrid>`_.
+
+
+License
+=======
+
+Released under the Apache License 2.0. See `<LICENSE>`_ file.
+
+
+Contributing
+============
+
+Ocean's `contributing guide <https://docs.dwavequantum.com/en/latest/ocean/contribute.html>`_
+has guidelines for contributing to Ocean packages.

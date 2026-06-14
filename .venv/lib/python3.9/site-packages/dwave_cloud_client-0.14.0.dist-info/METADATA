@@ -1,0 +1,169 @@
+Metadata-Version: 2.4
+Name: dwave-cloud-client
+Version: 0.14.0
+Summary: A minimal client for interacting with D-Wave cloud resources.
+Home-page: https://github.com/dwavesystems/dwave-cloud-client
+Author: D-Wave Systems Inc.
+License: Apache 2.0
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Requires-Python: >=3.9
+License-File: LICENSE
+Requires-Dist: requests[socks]<3,>=2.25
+Requires-Dist: urllib3<3,>=1.26
+Requires-Dist: pydantic<3,>=2
+Requires-Dist: homebase<2,>=1.0
+Requires-Dist: click<9,>=7.0
+Requires-Dist: python-dateutil<3,>=2.7
+Requires-Dist: plucky<0.5,>=0.4.3
+Requires-Dist: diskcache<6,>=5.2.1
+Requires-Dist: packaging>=19
+Requires-Dist: werkzeug<4,>=2.2
+Requires-Dist: typing-extensions<5,>=4.5.0
+Requires-Dist: authlib<2,>=1.2
+Requires-Dist: importlib_metadata>=5.0.0
+Requires-Dist: orjson>=3.10
+Requires-Dist: http-sf>=1.0.4
+Provides-Extra: test
+Requires-Dist: requests_mock; extra == "test"
+Requires-Dist: mock; extra == "test"
+Requires-Dist: numpy; extra == "test"
+Requires-Dist: coverage; extra == "test"
+Provides-Extra: bqm
+Requires-Dist: dimod!=0.11.4,<0.13,>=0.10.5; extra == "bqm"
+Requires-Dist: numpy>=1.17.3; extra == "bqm"
+Provides-Extra: dqm
+Requires-Dist: dimod!=0.11.4,<0.13,>=0.10.5; extra == "dqm"
+Requires-Dist: numpy>=1.17.3; extra == "dqm"
+Provides-Extra: cqm
+Requires-Dist: dimod!=0.11.4,<0.13,>=0.10.5; extra == "cqm"
+Requires-Dist: numpy>=1.17.3; extra == "cqm"
+Provides-Extra: nlm
+Requires-Dist: dwave-optimization<0.5,>=0.1.0; extra == "nlm"
+Requires-Dist: numpy>=1.20.0; extra == "nlm"
+Provides-Extra: mocks
+Requires-Dist: dwave-networkx>=0.8.10; extra == "mocks"
+Dynamic: author
+Dynamic: classifier
+Dynamic: description
+Dynamic: home-page
+Dynamic: license
+Dynamic: license-file
+Dynamic: provides-extra
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+.. image:: https://badge.fury.io/py/dwave-cloud-client.svg
+    :target: https://badge.fury.io/py/dwave-cloud-client
+    :alt: Latest version on PyPI
+
+.. image:: https://circleci.com/gh/dwavesystems/dwave-cloud-client.svg?style=shield
+    :target: https://circleci.com/gh/dwavesystems/dwave-cloud-client
+    :alt: Linux/MacOS/Windows build status
+
+.. image:: https://codecov.io/gh/dwavesystems/dwave-cloud-client/branch/master/graph/badge.svg
+    :target: https://codecov.io/gh/dwavesystems/dwave-cloud-client
+    :alt: Coverage report
+
+.. index-start-marker
+
+==================
+dwave-cloud-client
+==================
+
+.. start_cloud_about
+
+D-Wave Cloud Client is a minimal implementation of the REST interface used to
+communicate with D-Wave Sampler API (SAPI) servers.
+
+SAPI is an application layer built to provide resource discovery, permissions,
+and scheduling for quantum annealing resources at D-Wave Systems.
+This package provides a minimal Python interface to that layer without
+compromising the quality of interactions and workflow.
+
+The example below instantiates a D-Wave Cloud Client and solver based on the
+local system's auto-detected default configuration file and samples a random
+Ising problem tailored to fit the solver's graph.
+
+.. code-block:: python
+
+    import random
+    from dwave.cloud import Client
+
+    # Connect using the default or environment connection information
+    with Client.from_config() as client:
+
+        # Load the default solver
+        solver = client.get_solver()
+
+        # Build a random Ising model to exactly fit the graph the solver supports
+        linear = {index: random.choice([-1, 1]) for index in solver.nodes}
+        quad = {key: random.choice([-1, 1]) for key in solver.undirected_edges}
+
+        # Send the problem for sampling, include solver-specific parameter 'num_reads'
+        computation = solver.sample_ising(linear, quad, num_reads=100)
+
+        # Print the first sample out of a hundred
+        print(computation.samples[0])
+
+.. end_cloud_about
+
+
+Installation
+============
+
+Requires Python 3.8+:
+
+.. code-block:: bash
+
+    pip install dwave-cloud-client
+
+To install from source (available on GitHub in
+`dwavesystems/dwave-cloud-client`_ repo):
+
+.. code-block:: bash
+
+    pip install -r requirements.txt
+    python setup.py install
+
+.. _`dwavesystems/dwave-cloud-client`: https://github.com/dwavesystems/dwave-cloud-client
+
+
+License
+=======
+
+Released under the Apache License 2.0. See `<LICENSE>`_ file.
+
+
+Contributing
+============
+
+Ocean's `contributing guide <https://docs.dwavequantum.com/en/latest/ocean/contribute.html>`_
+has guidelines for contributing to Ocean packages.
+
+Release Notes
+-------------
+
+D-Wave Cloud Client uses `reno <https://docs.openstack.org/reno/>`_ to manage
+its release notes.
+
+When making a contribution to D-Wave Cloud Client that will affect users, create
+a new release note file by running
+
+.. code-block:: bash
+
+    reno new your-short-descriptor-here
+
+You can then edit the file created under ``releasenotes/notes/``.
+Remove any sections not relevant to your changes.
+Commit the file along with your changes.
+
+See reno's `user guide <https://docs.openstack.org/reno/latest/user/usage.html>`_
+for details.

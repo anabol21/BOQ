@@ -1,0 +1,3 @@
+show_id,cinema_id,hall_id,hall_capacity,movie_id,genre,age_rating,runtime_min,release_date,show_datetime,format,base_price,sold_tickets,occupancy_rate,city,day_of_week,is_weekend,hour_bucket,month,holiday_flag,release_age_days,lead_time_days,prime_time_flag,runtime_bucket,screening_number_for_movie
+show_0001,cinema_msk_01,hall_1,120,movie_dune_2,sci_fi,16+,166,2026-03-01,2026-03-15T19:00:00,IMAX,750.0,108,0.9000,Moscow,6,true,evening,3,false,14,5.0,true,long,4
+show_0002,cinema_msk_01,hall_2,80,movie_family_01,animation,6+,92,2026-02-20,2026-03-15T11:30:00,2D,420.0,41,0.5125,Moscow,6,true,morning,3,false,23,3.0,false,medium,2

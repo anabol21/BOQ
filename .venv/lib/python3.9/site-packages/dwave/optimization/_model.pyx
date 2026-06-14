@@ -1,0 +1,2122 @@
+# Copyright 2024 D-Wave Inc.
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#
+#        http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS,
+#    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#    See the License for the specific language governing permissions and
+#    limitations under the License.
+
+import collections.abc
+import functools
+import itertools
+import json
+import numbers
+import operator
+import struct
+import zipfile
+
+import numpy as np
+
+from cpython cimport Py_buffer
+from cpython.ref cimport PyObject
+from cython.operator cimport dereference as deref, preincrement as inc
+from cython.operator cimport typeid
+from libcpp cimport bool
+from libcpp.memory cimport make_shared
+from libcpp.typeindex cimport type_index
+from libcpp.unordered_map cimport unordered_map
+from libcpp.utility cimport move
+from libcpp.vector cimport vector
+
+from dwave.optimization.libcpp cimport dynamic_cast_ptr
+from dwave.optimization.libcpp.array cimport Array as cppArray
+from dwave.optimization.libcpp.graph cimport DecisionNode as cppDecisionNode
+from dwave.optimization.states cimport States
+from dwave.optimization.states import StateView
+from dwave.optimization.utilities import _file_object_arg, _lock
+
+__all__ = []
+
+
+DEFAULT_SERIALIZATION_VERSION = (1, 0)
+"""A 2-tuple encoding the default serialization format used for serializing models."""
+
+KNOWN_SERIALIZATION_VERSIONS = (
+    (0, 1),
+    (1, 0),
+)
+"""A tuple of 2-tuples listing all serialization versions supported."""
+
+
+# Store a mapping from the type_index of each C++ Node type to the relevant
+# Cython class. We don't refcount the PyObject*s pointing to each class because
+# the lifespace of this map is identical to that of the type objects.
+cdef unordered_map[type_index, PyObject*] _cpp_type_to_python
+
+# Register a mapping between the given Cython class and C++ class.
+cdef void _register(object cls, const type_info& typeinfo):
+    """Register a Python/Cython symbol to allow it to be created from a pointer
+    via `symbol_from_ptr`.
+    """
+    _cpp_type_to_python[type_index(typeinfo)] = <PyObject*>(cls)
+
+
+cdef object symbol_from_ptr(_Graph model, cppNode* node_ptr):
+    """Create a Python/Cython symbol from a C++ Node*."""
+
+    # If it's null, either after the cast of just as given, then we can't get a symbol from it
+    if not node_ptr:
+        raise ValueError("cannot construct a Symbol from the given pointer")
+
+    try:
+        cls = <object>_cpp_type_to_python.at(type_index(typeid(deref(node_ptr))))
+    except IndexError:
+        # IndexError would be returned by .at()
+        raise RuntimeError("given pointer cannot be cast to a known node type") from None
+
+    # In order to get nice polymorphism, it's much easier to pass the dispatch
+    # through Python, so we construct a generic Symbol holding the pointer and then
+    # construct the specific symbol from it.
+    return cls._from_symbol(Symbol.from_ptr(model, node_ptr))
+
+
+cdef class _Graph:
+    """A ``_Graph`` is a class that manages a C++ ``dwave::optimization::Graph``.
+
+    It is not intended for a user to use ``_Graph`` directly. Rather, classes
+    may inherit from ``_Graph``.
+    """
+    def __cinit__(self):
+        self._lock_count = 0
+
+        self._owning_ptr = make_shared[cppGraph]()
+        self._graph = self._owning_ptr.get()
+
+    @staticmethod
+    cdef _Graph from_shared_ptr(shared_ptr[cppGraph] ptr):
+        cdef _Graph model = _Graph.__new__(_Graph)
+
+        model._owning_ptr = ptr
+        model._graph = model._owning_ptr.get()
+
+        if model._graph.topologically_sorted():
+            model._lock_count += 1
+
+        return model
+
+    def __init__(self, *args, **kwargs):
+        # disallow direct construction of _Graphs, they should be constructed
+        # via their subclasses.
+        raise ValueError("_Graphs cannot be constructed directly")
+
+    def add_constraint(self, ArraySymbol value):
+        """Add a constraint to the model.
+
+        Args:
+            value: Value that must evaluate to True for the state
+                of the model to be feasible.
+
+        Returns:
+            The constraint symbol.
+
+        Examples:
+            This example adds a single constraint to a model.
+
+            >>> from dwave.optimization.model import Model
+            >>> model = Model()
+            >>> i = model.integer()
+            >>> c = model.constant(5)
+            >>> constraint_sym = model.add_constraint(i <= c)
+
+            The returned constraint symbol can be assigned and evaluated
+            for a model state:
+
+            >>> with model.lock():
+            ...     model.states.resize(1)
+            ...     i.set_state(0, 1) # Feasible state
+            ...     print(constraint_sym.state(0))
+            1.0
+            >>> with model.lock():
+            ...     i.set_state(0, 6) # Infeasible state
+            ...     print(constraint_sym.state(0))
+            0.0
+        """
+        if value is None:
+            raise ValueError("value cannot be None")
+        # TODO: shall we accept array valued constraints?
+        self._graph.add_constraint(value.array_ptr)
+        return value
+
+    def decision_state_size(self):
+        r"""Return an estimate of the size, in bytes, of a model's decision states.
+
+        For more details, see :meth:`.state_size()`.
+        This method differs by counting the state of only the decision variables.
+
+        Examples:
+            This example estimates the size of a model state.
+            In this example a single value is added to a :math:`5\times4` array.
+            The output of the addition is also a :math:`5\times4` array.
+            Each element of each array requires :math:`8` bytes to represent
+            in memory.
+            The total state size is :math:`(5*4 + 1 + 5*4) * 8 = 328` bytes,
+            but the decision state size is only :math:`5*4*8 = 160`.
+
+            >>> from dwave.optimization.model import Model
+            >>> model = Model()
+            >>> i = model.integer((5, 4))    # 5x4 array of integers
+            >>> c = model.constant(1)        # one scalar value, not a decision
+            >>> y = i + c                    # 5x4 array of values, not a decision
+            >>> model.state_size()           # (5*4 + 1 + 5*4) * 8 bytes
+            328
+            >>> model.decision_state_size()  # 5*4*8 bytes
+            160
+
+        See also:
+            :meth:`Symbol.state_size()` An estimate of the size of a symbol's
+            state.
+
+            :meth:`ArraySymbol.state_size()` An estimate of the size of an array
+            symbol's state.
+
+            :meth:`Model.state_size()` An estimate of the size of a model's
+            decision states.
+        """
+        return sum(sym.state_size() for sym in self.iter_decisions())
+
+    @classmethod
+    @_file_object_arg("rb")  # translate str/bytes file inputs into file objects
+    def from_file(cls, file, *,
+                  check_header = True,  # undocumented until fixed, see
+                                        # https://github.com/dwavesystems/dwave-optimization/issues/22
+                  substitute = None,
+                  lock = False,         # maybe want to change default in the future? But for now
+                                        # maintain backwards compatibility pre 0.6.0
+                  ):
+        """Construct a model from the given file.
+
+        Args:
+            file:
+                File pointer to a readable, seekable file-like object encoding
+                a model. Strings are interpreted as a file name.
+            substitute:
+                A mapping of symbol substitutions to make when loading the file.
+                The keys are strings giving the node class name to be substituted.
+                The values are callables to create a different node.
+                The callable should have the same signature as the substituted
+                symbol's constructor.
+            lock:
+                Whether to return a locked model. Only locked models will include
+                any saved intermediate states.
+
+        Returns:
+            A model.
+
+        See also:
+            :meth:`.into_file`, :meth:`.to_file`
+
+        .. versionchanged:: 0.6.0
+            Add the ``substitute`` and ``lock`` keyword-only arguments.
+
+        """
+        import dwave.optimization.symbols as symbols
+
+        if substitute is None:
+            substitute = dict()
+        elif not isinstance(substitute, collections.abc.Mapping):
+            raise TypeError("expected substitute to be a mapping of node names to classes")
+
+        version, header_data = _Graph._from_file_header(file)
+
+        cdef _Graph model = cls()
+
+        with zipfile.ZipFile(file, mode="r") as zf:
+            model_info = json.loads(zf.read("info.json"))
+
+            num_nodes = model_info.get("num_nodes")
+            if not isinstance(num_nodes, int) or num_nodes < 0:
+                raise ValueError("expected num_nodes to be a positive integer")
+
+            with zf.open("nodetypes.txt", "r") as fcls, zf.open("adj.adjlist", "r") as fadj:
+                for lineno, (classname, adjlist) in enumerate(zip(fcls, fadj)):
+                    # get the predecessors
+                    node_id, *predecessor_ids = map(int, adjlist.split(b" "))
+                    if node_id != lineno:  # sanity check
+                        raise ValueError("unexpected adj.adjlist format")
+
+                    predecessors = []
+                    for pid in predecessor_ids:
+                        if not 0 <= pid < node_id:
+                            raise ValueError("unexpected predecessor id")
+                        predecessors.append(symbol_from_ptr(model, model._graph.nodes()[pid].get()))
+
+                    # now make the node
+                    directory = f"nodes/{node_id}/"
+                    classname = classname.decode("UTF-8").rstrip("\n")
+
+                    # take advanctage of the symbols all being in the same namespace
+                    # and the fact that we (currently) encode them all by name
+                    node_cls = substitute.get(classname, getattr(symbols, classname, None))
+
+                    if not issubclass(node_cls, Symbol):
+                        raise ValueError("encoded model has an unsupported node type")
+
+                    node_cls._from_zipfile(zf, directory, model, predecessors=predecessors)
+
+            objective_buff = zf.read("objective.json")
+            if objective_buff:
+                objective_id = json.loads(objective_buff)
+                if not isinstance(objective_id, int) or objective_id >= model.num_nodes():
+                    raise ValueError("objective must be an integer and a valid node id")
+                model.minimize(symbol_from_ptr(model, model._graph.nodes()[objective_id].get()))
+
+            for cid in json.loads(zf.read("constraints.json")):
+                model.add_constraint(symbol_from_ptr(model, model._graph.nodes()[cid].get()))
+
+            if lock:
+                model.lock()
+
+            # Finally load any states from the file.
+            model.states._from_zipfile(zf, version=version)
+
+        if check_header:
+            expected = model._header_data(only_decision=False)
+
+            if not expected.items() <= header_data.items():
+                raise ValueError(
+                    "header data does not match the deserialized CQM. "
+                    f"Expected {expected!r} to be a subset of {header_data!r}"
+                    )
+
+        return model
+
+    @staticmethod
+    def _from_file_header(file):
+        """Read/validate the header from a model file.
+
+        Advances the stream position to the end of the header.
+
+        Returns:
+            The serialization version as a 2-tuple.
+
+            The header data as a dict.
+        """
+        prefix = b"DWNL"
+
+        read_prefix = file.read(len(prefix))
+        if read_prefix != prefix:
+            raise ValueError("Unknown file type. Expected magic string "
+                             f"{prefix!r} but received {read_prefix!r} "
+                             "instead")
+
+        version = tuple(file.read(2))
+
+        if version not in KNOWN_SERIALIZATION_VERSIONS:
+            raise ValueError("Unknown serialization format. Expected one of "
+                             f"{KNOWN_SERIALIZATION_VERSIONS} but received {version} "
+                             "instead. Upgrading your dwave-optimization version may help.")
+
+        header_len = struct.unpack('<I', file.read(4))[0]
+        header_data = json.loads(file.read(header_len).decode('ascii'))
+
+        return version, header_data
+
+    def _header_data(self, *, only_decision, max_num_states=float('inf')):
+        """The header data associated with the model (but not the states)."""
+        num_nodes = self.num_decisions() if only_decision else self.num_nodes()
+        try:
+            num_states = max(0, min(self.states.size(), max_num_states))
+        except AttributeError:
+            num_states = 0
+
+        decision_state_size = self.decision_state_size()
+        state_size = decision_state_size if only_decision else self.state_size()
+
+        return dict(
+            decision_state_size=decision_state_size,
+            num_nodes=num_nodes,
+            state_size=state_size,
+            num_states=num_states,
+        )
+
+    @_file_object_arg("wb")  # translate str/bytes file inputs into file objects
+    @_lock
+    def into_file(self, file, *,
+                  max_num_states = 0,
+                  only_decision = False,
+                  version = None,
+                  ):
+        """Serialize the model into an existing file.
+
+        Args:
+            file:
+                File pointer to an existing writeable, seekable
+                file-like object encoding a model. Strings are
+                interpreted as a file name.
+            max_num_states:
+                Maximum number of states to serialize along with the model.
+                The number of states serialized is
+                ``min(model.states.size(), max_num_states)``.
+            only_decision:
+                If ``True``, only decision variables are serialized.
+                If ``False``, all symbols are serialized.
+            version:
+                A 2-tuple indicating which serialization version to use.
+
+        Format Specification (Version 1.0):
+
+            This format is inspired by the `NPY format`_
+
+            The first 4 bytes are a magic string: exactly "DWNL".
+
+            The next 1 byte is an unsigned byte: the major version of the file
+            format.
+
+            The next 1 byte is an unsigned byte: the minor version of the file
+            format.
+
+            The next 4 bytes form a little-endian unsigned int, the length of
+            the header data HEADER_LEN.
+
+            The next HEADER_LEN bytes form the header data. This is a
+            json-serialized dictionary. The dictionary contains the following
+            key/values: ``decision_state_size``, ``num_nodes``, ``num_states``,
+            and ``state_size``. It is terminated by a newline character and
+            padded with spaces to make the entire length of the entire header
+            divisible by 64.
+
+            Following the header, the remaining data is encoded as a zip file.
+            All arrays are saved using the NumPy serialization format, see
+            :func:`numpy.save()`.
+
+            The information in the header is also saved in a json-formatted
+            file ``info.json``.
+
+            The serialization version is saved in a file ``version.txt``.
+
+            Each node is listed by type in a file ``nodetypes.txt``.
+
+            The adjacency of the nodes is saved in an adjacency format file,
+            ``adj.adjlist``. E.g., a graph with edges `a->b`, `a->c`, `b->d`
+            would be saved as
+
+            .. code-block::
+
+                a b c
+                b d
+                c
+                d
+
+            The id of the object is stored in ``objective.json``, and the list
+            of constraint symbols are stored by id in ``constraints.json``.
+
+            Finally each symbol has symbol-specific storage in a directory.
+
+            .. code-block::
+
+                nodes/
+                    <symbol id>/
+                        <symbol-specific storage>
+                    ...
+
+            The states, if also saved, are saved according to
+            :meth:`States.into_file()`.
+
+        Format Specification (Version 0.1):
+
+            Prior to version 1.0, states were saved differently.
+            See :meth:`States.into_file()`.
+
+        See also:
+            :meth:`.from_file`, :meth:`.to_file`
+
+        .. versionchanged:: 0.5.2
+            Added the ``version`` keyword-only argument.
+        .. versionchanged:: 0.6.0
+            Added support for serialization format version 1.0.
+
+        .. _NPY format: https://numpy.org/doc/stable/reference/generated/numpy.lib.format.html
+        """
+        version, model_info = self._into_file_header(
+            file,
+            version=version,
+            max_num_states=max_num_states,
+            only_decision=only_decision,
+        )
+
+        num_states = model_info["num_states"]
+
+        encoder = json.JSONEncoder(separators=(',', ':'))
+
+        # The rest of it is a zipfile
+        with zipfile.ZipFile(file, mode="w") as zf:
+            zf.writestr("info.json", encoder.encode(model_info))
+            zf.writestr("version.txt", ".".join(map(str, version)))
+
+            # Do three passes over the nodes
+
+            # If we're only encoding the decision variables then we want to stop early.
+            # We know that we're topologically sorted so the first num_decisions are
+            # exactly the decision variables.
+            stop = self.num_decisions() if only_decision else self.num_nodes()
+
+            # On the first pass we made a nodetypes.txt file that has the node names
+            with zf.open("nodetypes.txt", "w", force_zip64=True) as f:
+                for node in itertools.islice(self.iter_symbols(), 0, stop):
+                    f.write(type(node).__name__.encode("UTF-8"))
+                    f.write(b"\n")
+
+            # On the second pass we encode the adjacency
+            with zf.open("adj.adjlist", "w", force_zip64=True) as f:
+                # We don't actually need to make the Python symbols here, but it's convenient
+                # Also, if we're only_decision then there will never be predecessors, but
+                # let's reuse the code for now.
+                stop = self.num_decisions() if only_decision else self.num_nodes()
+                for node in itertools.islice(self.iter_symbols(), 0, stop):
+                    f.write(f"{node.topological_index()}".encode("UTF-8"))
+                    for pred in node.iter_predecessors():
+                        f.write(f" {pred.topological_index()}".encode("UTF-8"))
+                    f.write(b"\n")
+
+            # On the third pass, we allow nodes to save whatever info they want
+            # to in a nested node/<topological_index> directory
+            for node in itertools.islice(self.iter_symbols(), 0, stop):
+                directory = f"nodes/{node.topological_index()}/"
+                node._into_zipfile(zf, directory)
+
+            # If we're saving states, do a fourth pass saving the states.
+            if num_states > 0:
+                self.states._into_zipfile(zf, num_states=num_states, version=version)
+
+            # Encode the objective and the constraints
+            if self._graph.objective():
+                objective = symbol_from_ptr(self, self._graph.objective())
+            else:
+                objective = None
+            if objective is not None and objective.topological_index() < stop:
+                zf.writestr("objective.json", encoder.encode(objective.topological_index()))
+            else:
+                zf.writestr("objective.json", b"")
+
+            constraints = []  # todo: not yet available at the python level
+            for c in self.iter_constraints():
+                if c is not None and c.topological_index() < stop:
+                    constraints.append(c.topological_index())
+            zf.writestr("constraints.json", encoder.encode(constraints))
+
+    def _into_file_header(self, file, *, version, max_num_states, only_decision):
+        """Write the header that precedes the zipfile part of the serialization.
+
+        Also handles some input checking.
+        """
+        if version is None:
+            version = DEFAULT_SERIALIZATION_VERSION
+        elif version not in KNOWN_SERIALIZATION_VERSIONS:
+            raise ValueError("Unknown serialization format. Expected one of "
+                             f"{KNOWN_SERIALIZATION_VERSIONS} but received {version} "
+                             "instead. Upgrading your dwave-optimization version may help.")
+
+        model_info = self._header_data(
+            max_num_states=max_num_states,
+            only_decision=only_decision,
+        )
+
+        encoder = json.JSONEncoder(separators=(',', ':'))
+
+        # The first 4 bytes are DWNL
+        file.write(b"DWNL")
+
+        # The next 1 byte is an unsigned byte encoding the major version of the
+        # file format
+        # The next 1 byte is an unsigned byte encoding the minor version of the
+        # file format
+        file.write(bytes(version))
+
+        # The next 4 bytes form a little-endian unsigned int, the length of
+        # the header data `HEADER_LEN`.
+
+        # The next `HEADER_LEN` bytes form the header data. This will be `data`
+        # json-serialized and encoded with 'ascii'.
+        header_data = encoder.encode(model_info).encode("ascii")
+
+        # Now pad to make the entire header divisible by 64
+        padding = b' '*(64 - (len(header_data) + 4 + 2 + 4)  % 64)
+
+        file.write(struct.pack('<I', len(header_data) + len(padding)))  # header length
+        file.write(header_data)
+        file.write(padding)
+
+        return version, model_info
+
+    cpdef bool is_locked(self) noexcept:
+        """Lock status of the model.
+
+        No new symbols can be added to a locked model.
+
+        See also:
+            :meth:`.lock`, :meth:`.unlock`
+        """
+        return self._lock_count > 0
+
+    def iter_constraints(self):
+        """Iterate over all constraints in the model.
+
+        Examples:
+            This example adds a single constraint to a model and iterates over it.
+
+            >>> from dwave.optimization.model import Model
+            >>> model = Model()
+            >>> i = model.integer()
+            >>> c = model.constant(5)
+            >>> model.add_constraint(i <= c) # doctest: +ELLIPSIS
+            <dwave.optimization.symbols.LessEqual at ...>
+            >>> constraints = next(model.iter_constraints())
+        """
+        for ptr in self._graph.constraints():
+            yield symbol_from_ptr(self, ptr)
+
+    def iter_decisions(self):
+        """Iterate over all decision variables in the model.
+
+        Examples:
+            This example adds a single decision symbol to a model and iterates over it.
+
+            >>> from dwave.optimization.model import Model
+            >>> model = Model()
+            >>> i = model.integer()
+            >>> c = model.constant(5)
+            >>> model.add_constraint(i <= c) # doctest: +ELLIPSIS
+            <dwave.optimization.symbols.LessEqual at ...>
+            >>> decisions = next(model.iter_decisions())
+        """
+        for ptr in self._graph.decisions():
+            yield symbol_from_ptr(self, ptr)
+
+    def iter_inputs(self):
+        """Iterate over all inputs in the model.
+
+        Examples:
+            This example iterates over a model's inputs.
+
+            >>> from dwave.optimization.model import Model
+            >>> model = Model()
+            >>> i0, i1 = model.input(), model.input()
+            >>> c = model.constant(7)
+            >>> inputs = list(model.iter_inputs())
+            >>> len(inputs)
+            2
+
+        .. versionadded:: 0.6.2
+        """
+        for ptr in self._graph.inputs():
+            yield symbol_from_ptr(self, ptr)
+
+    def iter_symbols(self):
+        """Iterate over all symbols in the model.
+
+        Examples:
+            This example iterates over a model's symbols.
+
+            >>> from dwave.optimization.model import Model
+            >>> model = Model()
+            >>> i = model.integer(1, lower_bound=10)
+            >>> c = model.constant([[2, 3], [5, 6]])
+            >>> symbol_1, symbol_2 = model.iter_symbols()
+        """
+        # Because nodes() is a span of unique_ptr, we can't just iterate over
+        # it cythonically. Cython would try to do a copy/move assignment.
+        nodes = self._graph.nodes()
+        for i in range(nodes.size()):
+            yield symbol_from_ptr(self, nodes[i].get())
+
+    def lock(self):
+        """Lock the model.
+
+        No new symbols can be added to a locked model.
+        """
+        self._graph.topological_sort()  # does nothing if already sorted, so safe to call always
+        self._lock_count += 1
+
+        # note that we do not initialize the nodes or resize the states!
+        # We do it lazily for performance
+
+    def minimize(self, ArraySymbol value):
+        """Set the objective value to minimize.
+
+        Optimization problems have an objective and/or constraints. The objective
+        expresses one or more aspects of the problem that should be minimized
+        (equivalent to maximization when multiplied by a minus sign). For example,
+        an optimized itinerary might minimize the value of distance traveled or
+        cost of transportation or travel time.
+
+        Args:
+            value: Value for which to minimize the cost function.
+
+        Examples:
+            This example minimizes a simple polynomial, :math:`y = i^2 - 4i`,
+            within bounds.
+
+            >>> from dwave.optimization import Model
+            >>> model = Model()
+            >>> i = model.integer(lower_bound=-5, upper_bound=5)
+            >>> c = model.constant(4)
+            >>> y = i*i - c*i
+            >>> model.minimize(y)
+        """
+        if value is None:
+            raise ValueError("value cannot be None")
+        if value.size() < 1:
+            raise ValueError("the value of an empty array is ambiguous")
+        if value.size() > 1:
+            raise ValueError("the value of an array with more than one element is ambiguous")
+        self._graph.set_objective(value.array_ptr)
+
+    cpdef Py_ssize_t num_constraints(self) noexcept:
+        """Number of constraints in the model.
+
+        Examples:
+            This example checks the number of constraints in the model after
+            adding a couple of constraints.
+
+            >>> from dwave.optimization.model import Model
+            >>> model = Model()
+            >>> i = model.integer()
+            >>> c = model.constant([5, -14])
+            >>> model.add_constraint(i <= c[0]) # doctest: +ELLIPSIS
+            <dwave.optimization.symbols.LessEqual at ...>
+            >>> model.add_constraint(c[1] <= i) # doctest: +ELLIPSIS
+            <dwave.optimization.symbols.LessEqual at ...>
+            >>> model.num_constraints()
+            2
+        """
+        return self._graph.num_constraints()
+
+    cpdef Py_ssize_t num_decisions(self) noexcept:
+        """Number of independent decision nodes in the model.
+
+        An array-of-integers symbol, for example, counts as a single
+        decision node.
+
+        Examples:
+            This example checks the number of decisions in a model after
+            adding a single (size 20) decision symbol.
+
+            >>> from dwave.optimization.model import Model
+            >>> model = Model()
+            >>> c = model.constant([1, 5, 8.4])
+            >>> i = model.integer(20, upper_bound=100)
+            >>> model.num_decisions()
+            1
+        """
+        return self._graph.num_decisions()
+
+    def num_edges(self):
+        """Number of edges in the directed acyclic graph for the model.
+
+        Examples:
+            This example minimizes the sum of a single constant symbol and
+            a single decision symbol, then checks the number of edges in
+            the model.
+
+            >>> from dwave.optimization.model import Model
+            >>> model = Model()
+            >>> c = model.constant(5)
+            >>> i = model.integer()
+            >>> model.minimize(c + i)
+            >>> model.num_edges()
+            2
+        """
+        cdef Py_ssize_t num_edges = 0
+        for i in range(self._graph.num_nodes()):
+            num_edges += self._graph.nodes()[i].get().successors().size()
+        return num_edges
+
+    cpdef Py_ssize_t num_inputs(self) noexcept:
+        """Number of input nodes on the model.
+
+        See also:
+            :meth:`.num_symbols`
+            :class:`~dwave.optimization.symbols.Input`
+
+        Examples:
+            This example adds two inputs and a constant to a model and
+            checks the number of inputs.
+
+            >>> from dwave.optimization.model import Model
+            >>> model = Model()
+            >>> i0, i1 = model.input(), model.input()
+            >>> c = model.constant(7)
+            >>> model.num_inputs()
+            2
+
+        .. versionadded:: 0.6.2
+        """
+        return self._graph.num_inputs()
+
+    cpdef Py_ssize_t num_nodes(self) noexcept:
+        """Number of nodes in the directed acyclic graph for the model.
+
+        See also:
+            :meth:`.num_symbols`
+
+        Examples:
+            This example add a single (size 20) decision symbol and
+            a single (size 3) constant symbol checks the number of
+            nodes in the model.
+
+            >>> from dwave.optimization.model import Model
+            >>> model = Model()
+            >>> c = model.constant([1, 5, 8.4])
+            >>> i = model.integer(20, upper_bound=100)
+            >>> model.num_nodes()
+            2
+        """
+        return self._graph.num_nodes()
+
+    cpdef Py_ssize_t num_symbols(self) noexcept:
+        """Number of symbols tracked by the model.
+
+        Equivalent to the number of nodes in the directed acyclic
+        graph for the model.
+
+        See also:
+            :meth:`.num_nodes`
+
+        Examples:
+            This example add a single (size 20) decision symbol and
+            a single (size 3) constant symbol checks the number of
+            symbols in the model.
+
+            >>> from dwave.optimization.model import Model
+            >>> model = Model()
+            >>> c = model.constant([1, 5, 8.4])
+            >>> i = model.integer(20, upper_bound=100)
+            >>> model.num_symbols()
+            2
+        """
+        return self.num_nodes()
+
+    def remove_unused_symbols(self):
+        """Remove unused symbols from the model.
+
+        A symbol is considered unused if all of the following are true :
+
+        * It is not a decision.
+        * It is not an ancestor of the objective.
+        * It is not an ancestor of a constraint.
+        * It has no :class:`ArraySymbol` object(s) referring to it. See examples
+          below.
+
+        Returns:
+            The number of symbols removed.
+
+        Examples:
+            In this example we create a mix of unused and used symbols. Then
+            the unused symbols are removed with ``remove_unused_symbols()``.
+
+            >>> from dwave.optimization import Model
+            >>> model = Model()
+            >>> x = model.binary(5)
+            >>> x.sum()  # create a symbol that will never be used # doctest: +ELLIPSIS
+            <dwave.optimization.symbols.Sum at ...>
+            >>> model.minimize(x.prod())
+            >>> model.num_symbols()
+            3
+            >>> model.remove_unused_symbols()
+            1
+            >>> model.num_symbols()
+            2
+
+            In this example we create a mix of unused and used symbols.
+            However, unlike the previous example, we assign the unused symbol
+            to a name in the namespace. This prevents the symbol from being
+            removed.
+
+            >>> from dwave.optimization import Model
+            >>> model = Model()
+            >>> x = model.binary(5)
+            >>> y = x.sum()  # create a symbol and assign it a name
+            >>> model.minimize(x.prod())
+            >>> model.num_symbols()
+            3
+            >>> model.remove_unused_symbols()
+            0
+            >>> model.num_symbols()
+            3
+
+        """
+        if self.is_locked():
+            raise ValueError("cannot remove symbols from a locked model")
+        return self._graph.remove_unused_nodes()
+
+    def state_size(self):
+        r"""Return an estimate of the size, in bytes, of a model state.
+
+        For a model encoding several array operations, the state of each array
+        must be held in memory. This method returns an estimate of the total
+        memory needed to hold a state for every symbol in the model.
+
+        The number of bytes returned by this method is only an estimate. Some
+        symbols hold additional information that is not accounted for.
+
+        Examples:
+            This example estimates the size of a model state.
+            In this example a single value is added to a :math:`5\times4` array.
+            The output of the addition is also a :math:`5\times4` array.
+            Each element of each array requires :math:`8` bytes to represent
+            in memory.
+            Therefore the total state size is :math:`(5*4 + 1 + 5*4) * 8 = 328`
+            bytes.
+
+            >>> from dwave.optimization.model import Model
+            >>> model = Model()
+            >>> i = model.integer((5, 4))  # 5x4 array of integers
+            >>> c = model.constant(1)      # one scalar value
+            >>> y = i + c                  # 5x4 array of values
+            >>> model.state_size()         # (5*4 + 1 + 5*4) * 8 bytes
+            328
+
+        See also:
+            :meth:`Symbol.state_size()` An estimate of the size of a symbol's
+            state.
+
+            :meth:`ArraySymbol.state_size()` An estimate of the size of an array
+            symbol's state.
+
+            :meth:`Model.decision_state_size()` An estimate of the size of a
+            model's decision states.
+
+            :ref:`opt_solver_nl_properties` The properties of the
+            `Leap <https://cloud.dwavesys.com/leap/>`_ service's
+            quantum-classical hybrid nonlinear solver. Including limits on
+            the maximum state size of a model.
+        """
+        return sum(sym.state_size() for sym in self.iter_symbols())
+
+    def unlock(self):
+        """Release a lock, decrementing the lock count.
+
+        Symbols can be added to unlocked models only.
+
+        See also:
+            :meth:`.is_locked`, :meth:`.lock`
+        """
+        if self._lock_count < 1:
+            return  # already unlocked, nothing to do
+
+        self._lock_count -= 1
+
+        # if we're now unlocked, then reset the topological sort and the
+        # non-decision states
+        if self._lock_count < 1:
+            self._graph.reset_topological_sort()
+
+
+cdef class Symbol:
+    """Base class for symbols.
+
+    Each symbol corresponds to a node in the directed acyclic graph representing
+    the problem.
+    """
+    def __init__(self, *args, **kwargs):
+        # disallow direct construction of symbols, they should be constructed
+        # via their subclasses.
+        raise ValueError("Symbols cannot be constructed directly")
+
+    def __repr__(self):
+        """Return a representation of the symbol.
+
+        The representation refers to the identity of the underlying node, rather than
+        the identity of the Python symbol.
+        """
+        cls = type(self)
+        return f"<{cls.__module__}.{cls.__qualname__} at {self.id():#x}>"
+
+    cdef void initialize_node(self, _Graph model, cppNode* node_ptr) noexcept:
+        self.model = model
+
+        self.node_ptr = node_ptr
+        self.expired_ptr = node_ptr.expired_ptr()
+
+    def _deterministic_state(self):
+        """Return ``True`` if the symbol's state is uniquely determined by its
+        predecessors.
+        """
+        return self.node_ptr.deterministic_state()
+
+    def equals(self, other):
+        """Compare whether two symbols are identical.
+
+        Args:
+            other: A symbol for comparison.
+
+        Equal symbols represent the same quantity in the model.
+
+        Note that comparing symbols across models is expensive.
+
+        See Also:
+            :meth:`Symbol.maybe_equals`: an alternative for equality testing
+            that can return false positives but is faster.
+        """
+        cdef Py_ssize_t maybe = self.maybe_equals(other)
+        if maybe != 1:
+            return True if maybe else False
+
+        # todo: caching
+        return all(p.equals(q) for p, q in zip(self.iter_predecessors(), other.iter_predecessors()))
+
+    cpdef bool expired(self) noexcept:
+        return deref(self.expired_ptr)
+
+    @staticmethod
+    cdef Symbol from_ptr(_Graph model, cppNode* ptr):
+        """Construct a Symbol from a C++ Node pointer.
+
+        There are times when a Node* needs to be passed through the Python layer
+        and this method provides a mechanism to do so.
+        """
+        if not ptr:
+            raise ValueError("cannot construct a Symbol from a nullptr")
+        if model is None:
+            raise ValueError("model cannot be None")
+
+        cdef Symbol obj = Symbol.__new__(Symbol)
+        obj.initialize_node(model, ptr)
+        return obj
+
+    @classmethod
+    def _from_symbol(cls, Symbol symbol):
+        # Disallow lateral casts or demotions.
+        # This is to prevent, say, an Add to be constructed from a Subtract
+        # There are ways around it, but this method is private anyway so it
+        # should be enough of a discouragement and for safety.
+        if not issubclass(cls, type(symbol)):
+            raise TypeError(f"cannot construct a {cls.__name__} from a {type(symbol).__name__}")
+
+        cdef Symbol obj = cls.__new__(cls)
+        obj.initialize_node(symbol.model, symbol.node_ptr)
+        return obj
+
+    @classmethod
+    def _from_zipfile(cls, zf, directory, _Graph model, predecessors):
+        """Construct a symbol from a compressed file.
+
+        Args:
+            zf:
+                File pointer to a compressed file encoding
+                a symbol. Strings are interpreted as a file name.
+            directory:
+                Directory where the file is located.
+            model:
+                The relevant :class:`~dwave.optimization.model.Model`.
+            predecessors:
+                Not currently supported.
+        Returns:
+            A symbol.
+
+        See also:
+            :meth:`._into_zipfile`
+        """
+        # Many symbols are constructed using this pattern, so we do it as default.
+        return cls(*predecessors)
+
+    def has_state(self, Py_ssize_t index = 0):
+        """Return the initialization status of the indexed state.
+
+        Args:
+            index: Index of the queried state.
+
+        Returns:
+            True if the state is initialized.
+        """
+        if not self.model.is_locked() and self.node_ptr.topological_index() < 0:
+            raise TypeError("the state of an intermediate variable cannot be accessed without "
+                            "locking the model first. See model.lock().")
+
+        if not hasattr(self.model, "states"):
+            return False
+
+        cdef States states = self.model.states  # for Cython access
+
+        states.resolve()
+
+        cdef Py_ssize_t num_states = states.size()
+
+        if not -num_states <= index < num_states:
+            raise ValueError(f"index out of range: {index}")
+        if index < 0:  # allow negative indexing
+            index += num_states
+
+        # States are extended lazily, so if the state isn't yet long enough then this
+        # node's state has not been initialized
+        if <Py_ssize_t>(states._states[index].size()) <= self.node_ptr.topological_index():
+            return False
+
+        # Check that the state pointer is not null
+        # We need to explicitly cast to evoke unique_ptr's operator bool
+        return <bool>(states._states[index][self.node_ptr.topological_index()])
+
+    cpdef uintptr_t id(self) noexcept:
+        """Return the "identity" of the underlying node.
+
+        This identity is unique to the underlying node, rather than the identity
+        of the Python object representing it.
+        Therefore, ``symdol.id()`` is not the same as ``id(symbol)``!
+
+        Examples:
+            >>> from dwave.optimization import Model
+            ...
+            >>> model = Model()
+            >>> a = model.binary()
+            >>> aa, = model.iter_symbols()
+            >>> assert a.id() == aa.id()
+            >>> assert id(a) != id(aa)
+
+            While symbols are not hashable, the ``.id()`` is.
+
+            >>> model = Model()
+            >>> x = model.integer()
+            >>> seen = {x.id()}
+
+        See Also:
+            :meth:`.shares_memory`: ``a.shares_memory(b)`` is equivalent to ``a.id() == b.id()``.
+            
+            :meth:`.equals`: ``a.equals(b)`` will return ``True`` if ``a.id() == b.id()``. Though
+            the inverse is not necessarily true.
+
+        """
+        # We refer to the node_ptr, which is not necessarily the address of the
+        # C++ node, as it subclasses Node.
+        # But this is unique to each node, and functions as an id rather than
+        # as a pointer, so that's OK.
+        return <uintptr_t>self.node_ptr
+
+    def _into_zipfile(self, zf, directory):
+        """Store symbol-specific information to a compressed file.
+
+        Args:
+            zf:
+                File pointer to a compressed file to store the
+                symbol. Strings are interpreted as a file name.
+            directory:
+                Directory where the file is located.
+        Returns:
+            A compressed file.
+
+        See also:
+            :meth:`._from_zipfile`
+        """
+        # By default we don't save anything beyond what is saved by the model
+        pass
+
+    def iter_predecessors(self):
+        """Iterate over a symbol's predecessors in the model.
+
+        Examples:
+            This example constructs a :math:`b = \sum a` model, where :math:`a`
+            is a multiplication of two symbols, and iterates over the
+            predecessor's of :math:`b` (which is just :math:`a`).
+
+            >>> from dwave.optimization.model import Model
+            >>> model = Model()
+            >>> i = model.integer((2, 2), upper_bound=20)
+            >>> c = model.constant([[21, 11], [10, 4]])
+            >>> a = c * i
+            >>> b = a.sum()
+            >>> a.equals(next(b.iter_predecessors()))
+            True
+        """
+        cdef vector[cppNode*].const_iterator it = self.node_ptr.predecessors().begin()
+        cdef vector[cppNode*].const_iterator end = self.node_ptr.predecessors().end()
+        while it != end:
+            yield symbol_from_ptr(self.model, deref(it))
+            inc(it)
+
+    def iter_successors(self):
+        """Iterate over a symbol's successors in the model.
+
+        Examples:
+            This example constructs iterates over the successor symbols
+            of a :class:`~dwave.optimization.symbols.DisjointLists`
+            symbol.
+
+            >>> from dwave.optimization.model import Model
+            >>> model = Model()
+            >>> lsymbol, lsymbol_lists = model.disjoint_lists(
+            ...     primary_set_size=5,
+            ...     num_disjoint_lists=2)
+            >>> lsymbol_lists[0].equals(next(lsymbol.iter_successors()))
+            True
+        """
+        cdef vector[cppNode.SuccessorView].const_iterator it = self.node_ptr.successors().begin()
+        cdef vector[cppNode.SuccessorView].const_iterator end = self.node_ptr.successors().end()
+        while it != end:
+            yield symbol_from_ptr(self.model, deref(it).ptr)
+            inc(it)
+
+    def maybe_equals(self, other):
+        """Compare to another symbol.
+        
+        This method exists because a complete equality test can be expensive.
+
+        Args:
+            other: Another symbol in the model's directed acyclic graph.
+
+        Returns: integer
+            Supported return values are:
+
+            *   ``0``---Not equal (with certainty)
+            *   ``1``---Might be equal (no guarantees); a complete equality test is necessary
+            *   ``2``---Are equal (with certainty)
+
+        Examples:
+            This example compares
+            :class:`~dwave.optimization.symbols.IntegerVariable` symbols
+            of different sizes.
+
+            >>> from dwave.optimization import Model
+            >>> model = Model()
+            >>> i = model.integer(3, lower_bound=0, upper_bound=20)
+            >>> j = model.integer(3, lower_bound=-10, upper_bound=10)
+            >>> k = model.integer(5, upper_bound=55)
+            >>> i.maybe_equals(j)
+            1
+            >>> i.maybe_equals(k)
+            0
+
+        See Also:
+            :meth:`.equals`: a more expensive form of equality testing.
+        """
+        cdef Py_ssize_t NOT = 0
+        cdef Py_ssize_t MAYBE = 1
+        cdef Py_ssize_t DEFINITELY = 2
+
+        # If we're the same object, then we're equal
+        if self is other:
+            return DEFINITELY
+
+        if not isinstance(other, Symbol):
+            return NOT
+
+        # Should we require identical types?
+        if not isinstance(self, type(other)) and not isinstance(other, type(self)):
+            return NOT
+
+        cdef Symbol rhs = other
+
+        if self.shares_memory(rhs):
+            return DEFINITELY
+
+        # Check is that we have the right number of predecessors
+        if self.node_ptr.predecessors().size() != rhs.node_ptr.predecessors().size():
+            return NOT
+
+        # Finally, out prdecessors should have the same types in the same order
+        for p, q in zip(self.iter_predecessors(), rhs.iter_predecessors()):
+            # Should we require identical types?
+            if not isinstance(p, type(q)) and not isinstance(q, type(p)):
+                return NOT
+
+        return MAYBE
+
+    def reset_state(self, Py_ssize_t index):
+        """Reset the state of a symbol and any successor symbols.
+
+        Args:
+            index: Index of the state to reset.
+
+        Examples:
+            This example sets two states on a symbol with two successor symbols
+            and resets just one state.
+
+            >>> from dwave.optimization import Model
+            >>> model = Model()
+            >>> lsymbol, lsymbol_lists = model.disjoint_lists(primary_set_size=5, num_disjoint_lists=2)
+            >>> with model.lock():
+            ...     model.states.resize(2)
+            ...     lsymbol.set_state(0, [[0, 4], [1, 2, 3]])
+            ...     lsymbol.set_state(1, [[3, 4], [0, 1, 2]])
+            ...     print(f"state 0: {lsymbol_lists[0].state(0)} and {lsymbol_lists[1].state(0)}")
+            ...     print(f"state 1: {lsymbol_lists[0].state(1)} and {lsymbol_lists[1].state(1)}")
+            ...     lsymbol.reset_state(0)
+            ...     print("After reset:")
+            ...     print(f"state 0: {lsymbol_lists[0].state(0)} and {lsymbol_lists[1].state(0)}")
+            ...     print(f"state 1: {lsymbol_lists[0].state(1)} and {lsymbol_lists[1].state(1)}")
+            state 0: [0. 4.] and [1. 2. 3.]
+            state 1: [3. 4.] and [0. 1. 2.]
+            After reset:
+            state 0: [0. 1. 2. 3. 4.] and []
+            state 1: [3. 4.] and [0. 1. 2.]
+        """
+        cdef States states = self.model.states
+
+        states.resolve()
+
+        if not 0 <= index < states.size():
+            raise ValueError(f"index out of range: {index}")
+
+        if self.node_ptr.topological_index() < 0:
+            # unsorted nodes don't have a state to reset
+            return
+
+        # make sure the state vector at least contains self
+        if <Py_ssize_t>(states._states[index].size()) <= self.node_ptr.topological_index():
+            states._states[index].resize(self.node_ptr.topological_index() + 1)
+
+        self.model._graph.recursive_reset(states._states[index], self.node_ptr)
+
+    def shares_memory(self, other):
+        """Determine if two symbols share memory.
+
+        Args:
+            other: Another symbol.
+
+        Returns:
+            True if the two symbols share memory.
+        """
+        cdef Symbol other_
+        try:
+            other_ = other
+        except TypeError:
+            return False
+        return not self.expired() and self.id() == other_.id()
+
+    def _states_from_zipfile(self, zf, directory, num_states, version):
+        # unlike node serialization, by default we raise an error because if
+        # this is being called, it must have a state
+        raise NotImplementedError(f"{type(self).__name__} has not implemented state deserialization")
+
+    def _states_into_zipfile(self, zf, directory, num_states, version):
+        # unlike node serialization, by default we raise an error because if
+        # this is being called, it must have a state
+        raise NotImplementedError(f"{type(self).__name__} has not implemented state serialization")
+
+    def state_size(self):
+        """Return an estimated size, in bytes, of a symbol's state.
+
+        The number of bytes returned by this method is only an estimate. Some
+        symbols hold additional information that is not accounted for.
+
+        For most symbols, which are arrays, this method is
+        subclassed by the :class:`~dwave.optimization.model.ArraySymbol
+        class's :meth:`~dwave.optimization.model.ArraySymbol.state_size`
+        method.
+
+        See also:
+            :meth:`ArraySymbol.state_size()` An estimate of the size of an array
+            symbol's state.
+
+            :meth:`Model.state_size()` An estimate of the size of a model's
+            state.
+
+            
+        """
+        return 0
+
+    def topological_index(self):
+        """Topological index of the symbol.
+
+        Return ``None`` if the model is not topologically sorted.
+
+        Examples:
+            This example prints the indices of a two-symbol model.
+
+            >>> from dwave.optimization import Model
+            >>> model = Model()
+            >>> i = model.integer(100, lower_bound=20)
+            >>> sum_i = i.sum()
+            >>> with model.lock():
+            ...     for symbol in model.iter_symbols():
+            ...         print(f"Symbol {type(symbol)} is node {symbol.topological_index()}")
+            Symbol <class 'dwave.optimization.symbols.IntegerVariable'> is node 0
+            Symbol <class 'dwave.optimization.symbols.Sum'> is node 1
+        """
+        index = self.node_ptr.topological_index()
+        return index if index >= 0 else None
+
+def _split_indices(indices):
+    """Given a set of indices, made up of slices, integers, and array symbols,
+    create two consecutive indexing operations that can be passed to
+    BasicIndexing and AdvancedIndexing respectively.
+    """
+    # this is pure-Python and could be moved out of this .pyx file at some point
+
+    basic_indices = []
+    advanced_indices = []
+
+    for index in indices:
+        if isinstance(index, numbers.Integral):
+            # Only basic handles numeric indices and it removes the axis so
+            # only one gets the index.
+            basic_indices.append(index)
+        elif isinstance(index, slice):
+            if index.start is None and index.stop is None and index.step is None:
+                # empty slice, both handle it
+                basic_indices.append(index)
+                advanced_indices.append(index)
+            else:
+                # Advanced can only handle empty slices, so we do basic first
+                basic_indices.append(index)
+                advanced_indices.append(slice(None))
+        elif isinstance(index, (ArraySymbol, np.ndarray)):
+            # Only advanced handles arrays, it preserves the axis so basic gets
+            # an empty slice.
+            # We allow np.ndarray here for testing purposes. They are not (yet)
+            # natively handled by AdvancedIndexingNode.
+            basic_indices.append(slice(None))
+            advanced_indices.append(index)
+
+        else:
+            # this should be checked by the calling function, but just in case
+            raise RuntimeError("unexpected index type")
+
+    return tuple(basic_indices), tuple(advanced_indices)
+
+
+def _as_array_symbol(model, symbol):
+    if isinstance(symbol, ArraySymbol):
+        return symbol
+    try:
+        return model.constant(symbol)
+    except TypeError as err:
+        raise TypeError(f"{symbol!r} cannot be interpreted as an array symbol") from err
+
+
+# Ideally this wouldn't subclass Symbol, but Cython only allows a single
+# extension base class, so to support that we assume all ArraySymbols are
+# also Symbols (probably a fair assumption)
+cdef class ArraySymbol(Symbol):
+    """Base class for symbols that can be interpreted as an array."""
+
+    def __init__(self, *args, **kwargs):
+        # disallow direct construction of array symbols, they should be constructed
+        # via their subclasses.
+        raise ValueError("ArraySymbols cannot be constructed directly")
+
+    cdef void initialize_arraynode(self, _Graph model, cppArrayNode* array_ptr) noexcept:
+        self.array_ptr = array_ptr
+        self.initialize_node(model, array_ptr)
+
+    @classmethod
+    def _from_symbol(cls, Symbol symbol):
+        """Construct an ArraySymbol from another Symbol."""
+        # Disallow lateral casts or demotions.
+        # This is to prevent, say, an Add to be constructed from a Subtract
+        # There are ways around it, but this method is private anyway so it
+        # should be enough of a discouragement and for safety.
+        if not issubclass(cls, type(symbol)):
+            raise TypeError(f"cannot construct a {cls.__name__} from a {type(symbol).__name__}")
+
+        # Now try to "promote" the type and raise an error if that fails.
+        cdef cppArrayNode* ptr = dynamic_cast_ptr[cppArrayNode](symbol.node_ptr)
+        if not ptr:
+            raise TypeError(f"given symbol cannot construct a {cls.__name__}")
+
+        cdef ArraySymbol obj = cls.__new__(cls)
+        obj.initialize_arraynode(symbol.model, ptr)
+        return obj
+
+    def __abs__(self):
+        from dwave.optimization.symbols import Absolute  # avoid circular import
+        return Absolute(self)
+
+    def __add__(self, rhs):
+        try:
+            rhs = _as_array_symbol(self.model, rhs)
+        except TypeError:
+            return NotImplemented
+
+        from dwave.optimization.symbols import Add  # avoid circular import
+        return Add(self, rhs)
+
+    def __bool__(self):
+        # In the future we might want to return a Bool symbol, but __bool__ is so
+        # fundamental that I am hesitant to do even that.
+        raise ValueError("the truth value of an array symbol is ambiguous")
+
+    def __eq__(self, rhs):
+        try:
+            rhs = _as_array_symbol(self.model, rhs)
+        except TypeError:
+            return NotImplemented
+
+        # We could consider returning a Constant(True) is the case that self is rhs
+
+        from dwave.optimization.symbols import Equal # avoid circular import
+        return Equal(self, rhs)
+
+    def __ge__(self, rhs):
+        try:
+            rhs = _as_array_symbol(self.model, rhs)
+        except TypeError:
+            return NotImplemented
+
+        return rhs <= self
+
+    def __getitem__(self, index):
+        import dwave.optimization.symbols  # avoid circular import
+        if isinstance(index, tuple):
+            index = list(index)
+
+            # for all indexing styles, empty slices are padded to fill out the
+            # number of dimension
+            while len(index) < self.ndim():
+                index.append(slice(None))
+
+            # replace any array-like indices with constants
+            for i in range(len(index)):
+                if isinstance(index[i], numbers.Integral):
+                    continue
+                try:
+                    index[i] = _as_array_symbol(self.model, index[i])
+                except (TypeError, ValueError):
+                    pass
+
+            if all(isinstance(idx, (slice, numbers.Integral)) for idx in index):
+                # Basic indexing
+                # https://numpy.org/doc/stable/user/basics.indexing.html#basic-indexing
+                return dwave.optimization.symbols.BasicIndexing(self, *index)
+
+            elif all(isinstance(idx, ArraySymbol) or
+                     (isinstance(idx, slice) and idx.start is None and idx.stop is None and idx.step is None)
+                     for idx in index):
+                # Advanced indexing
+                # https://numpy.org/doc/stable/user/basics.indexing.html#advanced-indexing
+
+                return dwave.optimization.symbols.AdvancedIndexing(self, *index)
+
+            elif all(isinstance(idx, (ArraySymbol, slice, numbers.Integral)) for idx in index):
+                # Combined indexing
+                # https://numpy.org/doc/stable/user/basics.indexing.html#combining-advanced-and-basic-indexing
+
+                # We handle this by doing basic and then advanced indexing. In principle the other
+                # order may be more efficient in some cases, but for now let's do the simple thing
+
+                basic_indices, advanced_indices = _split_indices(index)
+                basic = dwave.optimization.symbols.BasicIndexing(self, *basic_indices)
+                return dwave.optimization.symbols.AdvancedIndexing(basic, *advanced_indices)
+
+            else:
+                # this error message is chosen to be similar to NumPy's
+                raise IndexError("only integers, slices (`:`), arrays, and array symbols are valid indices")
+
+        else:
+            return self[(index,)]
+
+    def __iadd__(self, rhs):
+        try:
+            rhs = _as_array_symbol(self.model, rhs)
+        except TypeError:
+            return NotImplemented
+
+        # If the user is doing +=, we make the assumption that they will want to
+        # do it again, so we jump to NaryAdd
+        from dwave.optimization.symbols import NaryAdd # avoid circular import
+        return NaryAdd(self, rhs)
+
+    def __imul__(self, rhs):
+        try:
+            rhs = _as_array_symbol(self.model, rhs)
+        except TypeError:
+            return NotImplemented
+
+        # If the user is doing *=, we make the assumption that they will want to
+        # do it again, so we jump to NaryMultiply
+        from dwave.optimization.symbols import NaryMultiply # avoid circular import
+        return NaryMultiply(self, rhs)
+
+    def __iter__(self):
+        if self.ndim() <= 0:
+            # NumPy's error is TypeError("iteration over a 0-d array"), so match
+            # that.
+            raise TypeError("iteration over a 0-d array symbol")
+
+        if self.array_ptr.dynamic():
+            # NumPy doesn't have a notion of dynamic size, but let's keep our
+            # error message consistent
+            raise TypeError("iteration over a dynamically sized array symbol")
+
+        yield from (self[i] for i in range(self.shape()[0]))
+
+    def __le__(self, rhs):
+        try:
+            rhs = _as_array_symbol(self.model, rhs)
+        except TypeError:
+            return NotImplemented
+
+        from dwave.optimization.symbols import LessEqual # avoid circular import
+        return LessEqual(self, rhs)
+
+    def __mod__(self, rhs):
+        try:
+            rhs = _as_array_symbol(self.model, rhs)
+        except TypeError:
+            return NotImplemented
+
+        from dwave.optimization.symbols import Modulus # avoid circular import
+        return Modulus(self, rhs)
+
+    def __mul__(self, rhs):
+        try:
+            rhs = _as_array_symbol(self.model, rhs)
+        except TypeError:
+            return NotImplemented
+
+        from dwave.optimization.symbols import Multiply  # avoid circular import
+        return Multiply(self, rhs)
+
+    def __neg__(self):
+        from dwave.optimization.symbols import Negative  # avoid circular import
+        return Negative(self)
+
+    def __pow__(self, rhs):
+        cdef Py_ssize_t exponent
+        try:
+            exponent = rhs
+        except TypeError:
+            return NotImplemented
+
+        if exponent == 2:
+            from dwave.optimization.symbols import Square  # avoid circular import
+            return Square(self)
+        # check if exponent is an integer greater than 0
+        elif isinstance(exponent, numbers.Real) and exponent > 0 and int(exponent) == exponent:
+            expanded = itertools.repeat(self, int(exponent))
+            out = next(expanded)  # get the first one
+            # multiply self by itself exponent times
+            for symbol in expanded:
+                out *= symbol
+            return out
+        raise ValueError("only integer exponents of 1 or greater are supported")
+
+    def __radd__(self, lhs):
+        try:
+            lhs = _as_array_symbol(self.model, lhs)
+        except TypeError:
+            return NotImplemented
+
+        return lhs + self
+
+    def __rmod__(self, lhs):
+        try:
+            lhs = _as_array_symbol(self.model, lhs)
+        except TypeError:
+            return NotImplemented
+
+        return lhs % self
+
+    def __rmul__(self, lhs):
+        try:
+            lhs = _as_array_symbol(self.model, lhs)
+        except TypeError:
+            return NotImplemented
+
+        return lhs * self
+
+    def __rsub__(self, lhs):
+        try:
+            lhs = _as_array_symbol(self.model, lhs)
+        except TypeError:
+            return NotImplemented
+
+        return lhs - self
+
+    def __rtruediv__(self, lhs):
+        try:
+            lhs = _as_array_symbol(self.model, lhs)
+        except TypeError:
+            return NotImplemented
+
+        return lhs / self
+
+    def __sub__(self, rhs):
+        try:
+            rhs = _as_array_symbol(self.model, rhs)
+        except TypeError:
+            return NotImplemented
+
+        from dwave.optimization.symbols import Subtract  # avoid circular import
+        return Subtract(self, rhs)
+
+    def __truediv__(self, rhs):
+        try:
+            rhs = _as_array_symbol(self.model, rhs)
+        except TypeError:
+            return NotImplemented
+
+        from dwave.optimization.symbols import Divide  # avoid circular import
+        return Divide(self, rhs)
+
+    def all(self):
+        """Create an :class:`~dwave.optimization.symbols.All` symbol.
+
+        The new symbol returns True when all elements evaluate to True.
+        """
+        from dwave.optimization.symbols import All  # avoid circular import
+        return All(self)
+
+    def any(self):
+        """Create an :class:`~dwave.optimization.symbols.Any` symbol.
+
+        The new symbol returns True when any elements evaluate to True.
+
+        .. versionadded:: 0.4.1
+        """
+        from dwave.optimization.symbols import Any  # avoid circular import
+        return Any(self)
+
+    def copy(self):
+        """Return an array symbol that is a copy of the array.
+
+        See Also:
+            :class:`~dwave.optimization.symbols.Copy` Equivalent class.
+
+        .. versionadded:: 0.5.1
+        """
+        from dwave.optimization.symbols import Copy  # avoid circular import
+        return Copy(self)
+
+    def flatten(self):
+        """Return an array symbol collapsed into one dimension.
+
+        Equivalent to ``symbol.reshape(-1)``.
+        """
+        return self.reshape(-1)
+
+    def max(self, *, initial=None):
+        """Create a :class:`~dwave.optimization.symbols.Max` symbol.
+
+        The new symbol returns the maximum value in its elements.
+
+        Args:
+            initial:
+                The starting value for the product operation.
+
+                .. versionadded:: 0.6.4
+
+        Examples:
+            This example adds the minimum value of an integer decision
+            variable to a model.
+
+            >>> from dwave.optimization.model import Model
+            >>> model = Model()
+            >>> i = model.integer(100, lower_bound=-50, upper_bound=50)
+            >>> i_max = i.max()
+            >>> type(i_max)
+            <class 'dwave.optimization.symbols.Max'>
+
+        See Also:
+            :class:`~dwave.optimization.symbols.Max`
+        """
+        from dwave.optimization.symbols import Max  # avoid circular import
+        return Max(self, initial=initial)
+
+    def maybe_equals(self, other):
+        # note: docstring inherited from Symbol.maybe_equal()
+        cdef Py_ssize_t maybe = super().maybe_equals(other)
+        cdef Py_ssize_t NOT = 0
+        cdef Py_ssize_t MAYBE = 1
+        cdef Py_ssize_t DEFINITELY = 2
+
+        if maybe != 1:
+            return DEFINITELY if maybe else NOT
+
+        if not isinstance(other, ArraySymbol):
+            return NOT
+
+        if self.shape() != other.shape():
+            return NOT
+
+        # I guess we don't care about strides
+
+        return MAYBE
+
+    def min(self, *, initial=None):
+        """Create a :class:`~dwave.optimization.symbols.Min` symbol.
+
+        The new symbol returns the minimum value in its elements.
+
+        Args:
+            initial:
+                The starting value for the product operation.
+
+                .. versionadded:: 0.6.4
+
+        Examples:
+            This example adds the minimum value of an integer decision
+            variable to a model.
+
+            >>> from dwave.optimization.model import Model
+            >>> model = Model()
+            >>> i = model.integer(100, lower_bound=-50, upper_bound=50)
+            >>> i_min = i.min()
+            >>> type(i_min)
+            <class 'dwave.optimization.symbols.Min'>
+
+        See Also:
+            :class:`~dwave.optimization.symbols.Min`
+        """
+        from dwave.optimization.symbols import Min  # avoid circular import
+        return Min(self, initial=initial)
+
+    def ndim(self):
+        """Return the number of dimensions for a symbol."""
+        return self.array_ptr.ndim()
+
+    def prod(self, *, axis=None, initial=None):
+        """Create a :class:`~dwave.optimization.symbols.Prod` symbol.
+
+        The new symbol returns the product of its elements.
+
+        Args:
+            axis:
+                Axis along which the a product operation is performed.
+
+                .. versionadded:: 0.5.1
+
+            initial:
+                The starting value for the product operation.
+
+                .. versionadded:: 0.6.4
+
+        Examples:
+            This example adds the product of an integer symbol's
+            elements to a model.
+
+            >>> from dwave.optimization.model import Model
+            >>> model = Model()
+            >>> i = model.integer(100, lower_bound=-50, upper_bound=50)
+            >>> i.prod()  # doctest: +ELLIPSIS
+            <dwave.optimization.symbols.Prod at ...>
+
+        See Also:
+            :class:`~dwave.optimization.symbols.PartialProd`
+            :class:`~dwave.optimization.symbols.Prod`
+        """
+        import dwave.optimization.symbols
+
+        if axis is not None:
+            return dwave.optimization.symbols.PartialProd(self, axis, initial=initial)
+
+        return dwave.optimization.symbols.Prod(self, initial=initial)
+
+    def reshape(self, *shape):
+        """Create a :class:`~dwave.optimization.symbols.Reshape` symbol.
+
+        Args:
+            shape: Shape of the created symbol.
+
+        The new symbol reshapes without changing the antecedent symbol's
+        data.
+
+        Examples:
+            This example reshapes a column vector into a row vector.
+
+            >>> from dwave.optimization import Model
+            >>> model = Model()
+            >>> j = model.integer(3, lower_bound=-10, upper_bound=10)
+            >>> j.shape()
+            (3,)
+            >>> k = j.reshape((1, 3))
+            >>> k.shape()
+            (1, 3)
+        """
+        from dwave.optimization.symbols import Reshape  # avoid circular import
+        if len(shape) <= 1:
+            shape = shape[0]
+
+        if not self.array_ptr.contiguous():
+            return Reshape(self.copy(), shape)
+
+        return Reshape(self, shape)
+
+    def resize(self, shape, fill_value=None):
+        """Return a new :class:`~dwave.optimization.symbols.Resize` symbol with the given shape.
+
+        Args:
+            shape: Shape of the new array. All dimension sizes must be non-negative.
+            fill_value: The value to be used if the resulting array is larger than
+                the given one. Defaults to 0.
+
+        Returns:
+            A :class:`~dwave.optimization.symbols.Resize` symbol.
+
+        Examples:
+            >>> from dwave.optimization import Model
+            ...
+            >>> model = Model()
+            >>> s = model.set(10)  # subsets of range(10)
+            >>> s_2x2 = s.resize((2, 2), fill_value=-1)
+            ...
+            >>> model.states.resize(1)
+            >>> with model.lock():
+            ...     s.set_state(0, [0, 1, 2])
+            ...     print(s_2x2.state(0))
+            [[ 0.  1.]
+             [ 2. -1.]]
+
+        See also:
+            :func:`~dwave.optimization.mathematical.resize`: equivalent function.
+
+            :class:`~dwave.optimization.symbols.Resize`: equivalent symbol.
+
+        .. versionadded:: 0.6.4
+        """
+        from dwave.optimization.mathematical import resize  # avoid circular import
+        return resize(self, shape, fill_value)
+
+    def shape(self):
+        """Return the shape of the symbol.
+
+        A :ref:`dynamic <optimization_philosophy_tensor_programming_dynamic>`
+        array symbol returns a ``-1`` in the first dimension.
+
+        Examples:
+            This example returns the shape of a newly instantiated symbol.
+
+            >>> from dwave.optimization import Model
+            >>> model = Model()
+            >>> x = model.binary(20)
+            >>> x.shape()
+            (20,)
+            >>> s = model.set(20)
+            >>> s.shape()
+            (-1,)
+        """
+        # We could do the whole buffer format thing and return a numpy array
+        # but I think it's better to follow NumPy and return a tuple
+        shape = self.array_ptr.shape()
+        return tuple(shape[i] for i in range(shape.size()))
+
+    def size(self):
+        r"""Return the number of elements in the symbol.
+
+        If the symbol has a fixed size, returns that size as an integer.
+        Otherwise, returns a :class:`~dwave.optimization.symbols.Size` symbol.
+
+        Examples:
+            This example checks the size of a :math:`2 \times 3`
+            binary symbol.
+
+            >>> from dwave.optimization import Model
+            >>> model = Model()
+            >>> x = model.binary((2, 3))
+            >>> x.size()
+            6
+
+        """
+        if self.array_ptr.dynamic():
+            from dwave.optimization.symbols import Size
+            return Size(self)
+
+        return self.array_ptr.size()
+
+    def state(self, Py_ssize_t index = 0, *, bool copy = True):
+        """Return the state of the symbol.
+
+        Args:
+            index: Index of the state.
+
+            copy: Currently only True is supported.
+
+        Returns:
+            State as a :class:`numpy.ndarray`.
+
+        Examples:
+            This example prints a symbol's two states: initialized
+            and uninitialized.
+
+            >>> from dwave.optimization import Model
+            >>> model = Model()
+            >>> x = model.binary((2, 3))
+            >>> z = x.sum()
+            >>> with model.lock():
+            ...     model.states.resize(2)
+            ...     x.set_state(0, [[0, 0, 1], [1, 0, 1]])
+            ...     print(z.state(0))
+            ...     print(z.state(1))
+            3.0
+            0.0
+        """
+        if not copy:
+            # todo: document once implemented
+            raise NotImplementedError("copy=False is not (yet) supported")
+
+        cdef Py_ssize_t num_states = self.model.states.size()
+
+        if not -num_states <= index < num_states:
+            raise ValueError(f"index out of range: {index}")
+        elif index < 0:  # allow negative indexing
+            index += num_states
+
+        if not self.model.is_locked() and self.node_ptr.topological_index() < 0:
+            raise TypeError("the state of an intermediate variable cannot be accessed without "
+                            "locking the model first. See model.lock().")
+
+        return np.array(StateView(self, index), copy=copy)
+
+    def _states_from_zipfile(self, zf, *, num_states, version):
+
+        directory = f"nodes/{self.topological_index()}/"
+
+        # Test whether we saved all of the state together. We can detect it
+        # based on the existance of an arrays.npy file.
+        try:
+            states_info = zf.getinfo(f"{directory}states.npy")
+        except KeyError:
+            states_info = None
+
+        if states_info is None:
+            for i in range(num_states):            
+                try:
+                    state_info = zf.getinfo(f"{directory}states/{i}/array.npy")
+                except KeyError:
+                    # states can be missing, in which case just skip this
+                    # index
+                    continue
+
+                with zf.open(state_info, mode="r") as f:
+                    state = np.load(f, allow_pickle=False)
+
+                self.set_state(i, state)
+        else:
+            with zf.open(states_info, mode="r") as f:
+                states = np.load(f, allow_pickle=False)
+
+            # iterate over axis 0, each "row" is then its own state
+            for i, state in enumerate(states):
+                self.set_state(i, state)
+
+    def _states_into_zipfile(self, zf, *, num_states, version):
+        states = [self.state(i) if self.has_state(i) else None for i in range(num_states)]
+
+        # If we have any missing states, or if the states don't all have the
+        # same shape then we save each state in a separate directory.
+        # Also, before serialization version 1.0 we always saved in a ragged format.
+        save_ragged = (
+            not states  # implicit to other conditions, but no harm being explicit
+            or version < (1, 0)
+            or any(state is None for state in states)
+            or len(set(state.shape for state in states)) != 1
+        )
+
+        directory = f"nodes/{self.topological_index()}/"
+
+        if save_ragged:
+            # each state gets its own sub-directory
+            for i, state in enumerate(states):
+                if state is None:
+                    continue
+                with zf.open(f"{directory}states/{i}/array.npy", mode="w", force_zip64=True) as f:
+                    np.save(f, state, allow_pickle=False)
+
+        else:
+            # the states are all saved in one file
+            states = np.asarray(states)  # stacks them along axis 0
+            with zf.open(f"{directory}states.npy", mode="w", force_zip64=True) as f:
+                np.save(f, states, allow_pickle=False)
+
+    def state_size(self):
+        r"""Return an estimate of the size, in bytes, of an array symbol's state.
+
+        For an array symbol, the estimate of the state size is exactly the
+        number of bytes needed to encode the array.
+
+        Examples:
+            This example returns the size of an integer symbol.
+            In this example, the symbol encodes a :math:`5\times4` of integers,
+            each represented by a :math:`8` byte float.
+            Therefore the estimated state size is :math:`5*4*8 = 160` bytes.
+
+            >>> from dwave.optimization import Model
+            >>> model = Model()
+            >>> i = model.integer((5, 4))  # 5x4 array of integers
+            >>> i.state_size()             # 5*4*8 bytes
+            160
+
+        See also:
+            :meth:`Symbol.state_size()` An estimate of the size of a symbol's
+            state.
+
+            :meth:`Model.state_size()` An estimate of the size of a model's
+            state.
+        """
+        if not self.array_ptr.dynamic():
+            # For fixed-length arrays, the state size is simply the size of the
+            # array times the size of each element in the array.
+            return self.array_ptr.size() * self.array_ptr.itemsize()
+
+        sizeinfo = self.array_ptr.sizeinfo()
+
+        # If it gets its size from elsewhere, do the calculation. We could be
+        # more efficient about this, but for now let's do the simple thing
+        if sizeinfo.array_ptr != self.array_ptr:
+            sizeinfo = sizeinfo.substitute(self.model.num_nodes())
+
+        # This shouldn't happen, but just in case...
+        if not sizeinfo.max.has_value():
+            raise RuntimeError(f"size of {self!r} is unbounded")
+
+        return sizeinfo.max.value() * self.array_ptr.itemsize()
+
+    def strides(self):
+        """Return the stride length, in bytes, for traversing a symbol.
+
+        Returns:
+            Tuple of the number of bytes to step in each dimension when
+            traversing a symbol.
+
+        Examples:
+            This example returns the size of an integer symbol.
+
+            >>> from dwave.optimization import Model
+            >>> model = Model()
+            >>> i = model.integer((2, 3), upper_bound=20)
+            >>> i.strides()
+            (24, 8)
+        """
+        strides = self.array_ptr.strides()
+        return tuple(strides[i] for i in range(strides.size()))
+
+    def sum(self, *, axis=None, initial=None):
+        """Create a :class:`~dwave.optimization.symbols.Sum` symbol.
+
+        The new symbol returns the sum of its elements.
+
+        Args:
+            axis:
+                Axis along which the a plus operation is performed.
+
+                .. versionadded:: 0.4.1
+
+            initial:
+                The starting value for the plus operation.
+
+                .. versionadded:: 0.6.4
+
+        Examples:
+            This example adds the product of an integer symbol's
+            elements to a model.
+
+            >>> from dwave.optimization.model import Model
+            >>> model = Model()
+            >>> i = model.integer(100, lower_bound=-50, upper_bound=50)
+            >>> i.sum()  # doctest: +ELLIPSIS
+            <dwave.optimization.symbols.Sum at ...>
+
+        See Also:
+            :class:`~dwave.optimization.symbols.PartialSum`
+            :class:`~dwave.optimization.symbols.Sum`
+        """
+        import dwave.optimization.symbols
+
+        if axis is not None:
+            return dwave.optimization.symbols.PartialSum(self, axis, initial=initial)
+
+        return dwave.optimization.symbols.Sum(self, initial=initial)

@@ -1,0 +1,193 @@
+#!/usr/bin/env python3
+# Copyright 2010-2025 Google LLC
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Module exporting all classes and functions needed for MathOpt.
+
+This module defines aliases to all classes and functions needed for regular use
+of MathOpt. It removes the need for users to have multiple imports for specific
+sub-modules.
+
+For example instead of:
+  from ortools.math_opt.python import model
+  from ortools.math_opt.python import solve
+
+  m = model.Model()
+  solve.solve(m)
+
+we can simply do:
+  from ortools.math_opt.python import mathopt
+
+  m = mathopt.Model()
+  mathopt.solve(m)
+"""
+
+# pylint: disable=unused-import
+# pylint: disable=g-importing-member
+
+from ortools.math_opt.python.callback import BarrierStats
+from ortools.math_opt.python.callback import CallbackData
+from ortools.math_opt.python.callback import CallbackRegistration
+from ortools.math_opt.python.callback import CallbackResult
+from ortools.math_opt.python.callback import Event
+from ortools.math_opt.python.callback import GeneratedConstraint
+from ortools.math_opt.python.callback import MipStats
+from ortools.math_opt.python.callback import parse_callback_data
+from ortools.math_opt.python.callback import PresolveStats
+from ortools.math_opt.python.callback import SimplexStats
+from ortools.math_opt.python.compute_infeasible_subsystem_result import (
+    ComputeInfeasibleSubsystemResult,
+)
+from ortools.math_opt.python.compute_infeasible_subsystem_result import ModelSubset
+from ortools.math_opt.python.compute_infeasible_subsystem_result import (
+    ModelSubsetBounds,
+)
+from ortools.math_opt.python.compute_infeasible_subsystem_result import (
+    parse_compute_infeasible_subsystem_result,
+)
+from ortools.math_opt.python.compute_infeasible_subsystem_result import (
+    parse_model_subset,
+)
+from ortools.math_opt.python.compute_infeasible_subsystem_result import (
+    parse_model_subset_bounds,
+)
+from ortools.math_opt.python.errors import InternalMathOptError
+from ortools.math_opt.python.errors import status_proto_to_exception
+from ortools.math_opt.python.expressions import evaluate_expression
+from ortools.math_opt.python.expressions import fast_sum
+from ortools.math_opt.python.indicator_constraints import IndicatorConstraint
+from ortools.math_opt.python.init_arguments import gurobi_isv_key_from_proto
+from ortools.math_opt.python.init_arguments import GurobiISVKey
+from ortools.math_opt.python.init_arguments import (
+    streamable_gurobi_init_arguments_from_proto,
+)
+from ortools.math_opt.python.init_arguments import (
+    streamable_solver_init_arguments_from_proto,
+)
+from ortools.math_opt.python.init_arguments import StreamableCpSatInitArguments
+from ortools.math_opt.python.init_arguments import StreamableEcosInitArguments
+from ortools.math_opt.python.init_arguments import StreamableGlopInitArguments
+from ortools.math_opt.python.init_arguments import StreamableGlpkInitArguments
+from ortools.math_opt.python.init_arguments import StreamableGScipInitArguments
+from ortools.math_opt.python.init_arguments import StreamableGurobiInitArguments
+from ortools.math_opt.python.init_arguments import StreamableHighsInitArguments
+from ortools.math_opt.python.init_arguments import StreamableOsqpInitArguments
+from ortools.math_opt.python.init_arguments import StreamablePdlpInitArguments
+from ortools.math_opt.python.init_arguments import StreamableSantoriniInitArguments
+from ortools.math_opt.python.init_arguments import StreamableScsInitArguments
+from ortools.math_opt.python.init_arguments import StreamableSolverInitArguments
+from ortools.math_opt.python.linear_constraints import LinearConstraint
+from ortools.math_opt.python.linear_constraints import LinearConstraintMatrixEntry
+from ortools.math_opt.python.message_callback import list_message_callback
+from ortools.math_opt.python.message_callback import log_messages
+from ortools.math_opt.python.message_callback import printer_message_callback
+from ortools.math_opt.python.message_callback import SolveMessageCallback
+from ortools.math_opt.python.message_callback import vlog_messages
+from ortools.math_opt.python.model import Model
+from ortools.math_opt.python.model import UpdateTracker
+from ortools.math_opt.python.model_parameters import ModelSolveParameters
+from ortools.math_opt.python.model_parameters import ObjectiveParameters
+from ortools.math_opt.python.model_parameters import parse_objective_parameters
+from ortools.math_opt.python.model_parameters import parse_solution_hint
+from ortools.math_opt.python.model_parameters import SolutionHint
+from ortools.math_opt.python.objectives import AuxiliaryObjective
+from ortools.math_opt.python.objectives import Objective
+from ortools.math_opt.python.parameters import Emphasis
+from ortools.math_opt.python.parameters import emphasis_from_proto
+from ortools.math_opt.python.parameters import emphasis_to_proto
+from ortools.math_opt.python.parameters import GlpkParameters
+from ortools.math_opt.python.parameters import GurobiParameters
+from ortools.math_opt.python.parameters import lp_algorithm_from_proto
+from ortools.math_opt.python.parameters import lp_algorithm_to_proto
+from ortools.math_opt.python.parameters import LPAlgorithm
+from ortools.math_opt.python.parameters import SolveParameters
+from ortools.math_opt.python.parameters import solver_type_from_proto
+from ortools.math_opt.python.parameters import solver_type_to_proto
+from ortools.math_opt.python.parameters import SolverType
+from ortools.math_opt.python.quadratic_constraints import QuadraticConstraint
+from ortools.math_opt.python.result import FeasibilityStatus
+from ortools.math_opt.python.result import Limit
+from ortools.math_opt.python.result import ObjectiveBounds
+from ortools.math_opt.python.result import parse_objective_bounds
+from ortools.math_opt.python.result import parse_problem_status
+from ortools.math_opt.python.result import parse_solve_result
+from ortools.math_opt.python.result import parse_solve_stats
+from ortools.math_opt.python.result import parse_termination
+from ortools.math_opt.python.result import ProblemStatus
+from ortools.math_opt.python.result import SolveResult
+from ortools.math_opt.python.result import SolveStats
+from ortools.math_opt.python.result import Termination
+from ortools.math_opt.python.result import TerminationReason
+from ortools.math_opt.python.solution import Basis
+from ortools.math_opt.python.solution import BasisStatus
+from ortools.math_opt.python.solution import DualRay
+from ortools.math_opt.python.solution import DualSolution
+from ortools.math_opt.python.solution import optional_solution_status_to_proto
+from ortools.math_opt.python.solution import parse_basis
+from ortools.math_opt.python.solution import parse_dual_ray
+from ortools.math_opt.python.solution import parse_dual_solution
+from ortools.math_opt.python.solution import parse_optional_solution_status
+from ortools.math_opt.python.solution import parse_primal_ray
+from ortools.math_opt.python.solution import parse_primal_solution
+from ortools.math_opt.python.solution import parse_solution
+from ortools.math_opt.python.solution import PrimalRay
+from ortools.math_opt.python.solution import PrimalSolution
+from ortools.math_opt.python.solution import Solution
+from ortools.math_opt.python.solution import SolutionStatus
+from ortools.math_opt.python.solve import compute_infeasible_subsystem
+from ortools.math_opt.python.solve import IncrementalSolver
+from ortools.math_opt.python.solve import solve
+from ortools.math_opt.python.solve import SolveCallback
+from ortools.math_opt.python.solver_resources import SolverResources
+from ortools.math_opt.python.sparse_containers import LinearConstraintFilter
+from ortools.math_opt.python.sparse_containers import parse_linear_constraint_map
+from ortools.math_opt.python.sparse_containers import parse_quadratic_constraint_map
+from ortools.math_opt.python.sparse_containers import parse_variable_map
+from ortools.math_opt.python.sparse_containers import QuadraticConstraintFilter
+from ortools.math_opt.python.sparse_containers import SparseVectorFilter
+from ortools.math_opt.python.sparse_containers import to_sparse_double_vector_proto
+from ortools.math_opt.python.sparse_containers import to_sparse_int32_vector_proto
+from ortools.math_opt.python.sparse_containers import VariableFilter
+from ortools.math_opt.python.sparse_containers import VarOrConstraintType
+from ortools.math_opt.python.variables import as_flat_linear_expression
+from ortools.math_opt.python.variables import as_flat_quadratic_expression
+from ortools.math_opt.python.variables import BoundedLinearExpression
+from ortools.math_opt.python.variables import BoundedLinearTypes
+from ortools.math_opt.python.variables import BoundedLinearTypesList
+from ortools.math_opt.python.variables import BoundedQuadraticExpression
+from ortools.math_opt.python.variables import BoundedQuadraticTypes
+from ortools.math_opt.python.variables import BoundedQuadraticTypesList
+from ortools.math_opt.python.variables import LinearBase
+from ortools.math_opt.python.variables import LinearExpression
+from ortools.math_opt.python.variables import LinearLinearProduct
+from ortools.math_opt.python.variables import LinearProduct
+from ortools.math_opt.python.variables import LinearSum
+from ortools.math_opt.python.variables import LinearTerm
+from ortools.math_opt.python.variables import LinearTypes
+from ortools.math_opt.python.variables import LinearTypesExceptVariable
+from ortools.math_opt.python.variables import LowerBoundedLinearExpression
+from ortools.math_opt.python.variables import LowerBoundedQuadraticExpression
+from ortools.math_opt.python.variables import QuadraticBase
+from ortools.math_opt.python.variables import QuadraticExpression
+from ortools.math_opt.python.variables import QuadraticProduct
+from ortools.math_opt.python.variables import QuadraticSum
+from ortools.math_opt.python.variables import QuadraticTerm
+from ortools.math_opt.python.variables import QuadraticTermKey
+from ortools.math_opt.python.variables import QuadraticTypes
+from ortools.math_opt.python.variables import UpperBoundedLinearExpression
+from ortools.math_opt.python.variables import UpperBoundedQuadraticExpression
+from ortools.math_opt.python.variables import VarEqVar
+from ortools.math_opt.python.variables import Variable
+
+# pylint: enable=unused-import
+# pylint: enable=g-importing-member

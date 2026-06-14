@@ -1,0 +1,10 @@
+[dwave_contrib]
+dwave-inspector = dwave.inspector.package_info:contrib
+
+[inspectorapp_proxies]
+jupyter_server_proxy = dwave.inspector.proxies:jupyter_server_proxy
+
+[inspectorapp_viewers]
+browser_tab = dwave.inspector.viewers:webbrowser_tab
+browser_window = dwave.inspector.viewers:webbrowser_window
+jupyter_inline = dwave.inspector.viewers:jupyter_inline
